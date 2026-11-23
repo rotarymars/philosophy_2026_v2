@@ -2,6 +2,7 @@
 
 #include "polypack/polypack.hpp"
 
+#include <algorithm>
 #include <functional>
 #include <iostream>
 #include <random>
@@ -259,6 +260,122 @@ void testOverlapAgainstReference() {
   CHECK(overlapping > 1000 && overlapping < 19000);  // the sample exercises both outcomes
 }
 
+void testGenerator() {
+  std::mt19937_64 rng(7);
+  GeneratorConfig config;
+  const std::vector<Rotation> rotations = defaultRotations();
+  for (int i = 0; i < 200; ++i) {
+    const Polygon p = randomPolygon(rng, config);
+    CHECK(p.bounds().min == P("0", "0"));
+    CHECK(static_cast<int>(p.size()) <= config.maxVertices);
+    for (const Rotation& r : rotations) {
+      Polygon q = p.rotated(r, P("0", "0"));
+      q = q.translated(-q.bounds().min);
+      CHECK(isContainedIn(q, unitSquare()));
+    }
+  }
+  GeneratorConfig bad;
+  bad.maxRadius = 0.6;
+  CHECK_THROWS(validate(bad));
+}
+
+void testSlide() {
+  const Box unit = unitSquare();
+  const Polygon sq = rect("1/2", "3/4", "3/4", "1");
+
+  // Empty bin: falls to the floor, then slides to the left wall.
+  CHECK(maxSlide(sq, Direction::Down, {}, unit) == Rational(3, 4));
+  CHECK(settleBottomLeft(sq, {}, unit) == rect("0", "0", "1/4", "1/4"));
+
+  // Lands exactly on a shelf.
+  const std::vector<Polygon> shelf = {rect("0", "0", "1", "1/4")};
+  CHECK(maxSlide(sq, Direction::Down, shelf, unit) == Rational(1, 2));
+
+  // Grazing: touching only at a corner and sliding along a shared vertical
+  // line must not block the motion.
+  const std::vector<Polygon> post = {rect("0", "0", "1/4", "1/2")};
+  CHECK(maxSlide(rect("1/4", "1/2", "1/2", "3/4"), Direction::Down, post, unit) == Rational(1, 2));
+  CHECK(maxSlide(rect("1/4", "0", "1/2", "1/4"), Direction::Left, post, unit) == 0);
+
+  // A rotated triangle settling onto a slanted surface rests exactly in contact.
+  const std::vector<Polygon> ramp = {path("M 0 0 L 1 0 L 0 1/2 Z")};
+  const Polygon tri = path("M 0 0 L 1/5 0 L 1/10 1/6 Z")
+                          .rotated(Rotation::fromHalfAngleTangent(Rational(1, 2)), P("0", "0"));
+  const Polygon start = tri.translated(P("1/2", "3/4") - tri.bounds().min);
+  const Polygon rest = settleBottomLeft(start, ramp, unit);
+  CHECK(!overlap(rest, ramp[0]));
+  CHECK(isContainedIn(rest, unit));
+  CHECK(maxSlide(rest, Direction::Down, ramp, unit) == 0);
+  CHECK(maxSlide(rest, Direction::Left, ramp, unit) == 0);
+}
+
+// Every packing produced by the environment must be exactly valid.
+bool packingIsValid(const PackingEnv& env) {
+  for (const Bin& bin : env.allBins()) {
+    for (std::size_t i = 0; i < bin.items().size(); ++i) {
+      if (!isContainedIn(bin.items()[i], bin.bounds())) return false;
+      for (std::size_t j = i + 1; j < bin.items().size(); ++j) {
+        if (interiorsOverlap(bin.items()[i], bin.items()[j])) return false;
+      }
+    }
+  }
+  return true;
+}
+
+void testEnv() {
+  EnvConfig config;
+  config.itemsPerEpisode = 25;
+  PackingEnv env(config);
+  CHECK(env.actionCount() == 3 * 8 * 16);
+
+  // First item: only the "new bin" slot (column 0, any rotation) is legal.
+  env.reset(42);
+  for (int a = 0; a < env.actionCount(); ++a) {
+    const bool newBinSlot = a / (env.rotations() * env.columns()) == config.openBins;
+    CHECK(env.isLegal(a) == (newBinSlot && a % env.columns() == 0));
+  }
+  CHECK_THROWS(env.step(0));
+
+  // Random legal play and first-fit play both give exact, valid packings.
+  std::mt19937 rng(3);
+  int steps = 0;
+  float totalReward = 0;
+  while (!env.done()) {
+    std::vector<int> legal;
+    for (int a = 0; a < env.actionCount(); ++a) {
+      if (env.isLegal(a)) legal.push_back(a);
+    }
+    totalReward += env.step(legal[rng() % legal.size()]).reward;
+    ++steps;
+  }
+  CHECK(steps == config.itemsPerEpisode);
+  CHECK(packingIsValid(env));
+  CHECK(-totalReward == static_cast<float>(env.binsUsed()));
+  CHECK(env.binsUsed() >= env.areaLowerBound());
+
+  PackingEnv a(config), b(config);
+  a.reset(9);
+  b.reset(9);
+  while (!a.done()) {
+    CHECK(a.currentItem() == b.currentItem());  // same seed, same items
+    a.step(firstFitAction(a));
+    b.step(firstFitAction(b));
+  }
+  CHECK(packingIsValid(a));
+  CHECK(a.binsUsed() == b.binsUsed());
+
+  // Observation buffers have the documented sizes and agree with the mask.
+  a.reset(5);
+  a.step(firstFitAction(a));
+  const std::size_t px = static_cast<std::size_t>(a.rasterSize()) * a.rasterSize();
+  std::vector<std::uint8_t> bins(a.slots() * px), items(a.rotations() * px), mask(a.actionCount());
+  std::vector<float> slotF(a.slots() * PackingEnv::kSlotFeatures), globalF(PackingEnv::kGlobalFeatures);
+  a.observe(bins.data(), items.data(), slotF.data(), globalF.data(), mask.data());
+  CHECK(mask == a.mask());
+  CHECK(slotF[0] == 1.0f && slotF[1] == 0.0f);  // slot 0 holds the open bin
+  CHECK(std::count_if(bins.begin(), bins.begin() + px, [](std::uint8_t v) { return v > 0; }) > 0);
+}
+
 void testBin() {
   Bin bin;
   CHECK(bin.tryPlace(rect("0", "0", "1/2", "1/2")));
@@ -284,6 +401,9 @@ int main() {
       {"overlap", testOverlap},
       {"overlap vs SAT reference (random triangles)", testOverlapAgainstReference},
       {"bin", testBin},
+      {"generator", testGenerator},
+      {"slide", testSlide},
+      {"environment", testEnv},
   };
   for (const auto& [name, fn] : tests) {
     std::cout << "[ RUN  ] " << name << '\n';

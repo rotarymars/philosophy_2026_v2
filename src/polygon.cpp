@@ -116,13 +116,12 @@ void Polygon::ensureSimple() const {
   for (std::size_t i = 0; i < n; ++i) {
     const Point& a = vertices_[i];
     const Point& b = vertices_[(i + 1) % n];
-    const Box edgeBox = segmentBounds(a, b);
     for (std::size_t j = i + 1; j < n; ++j) {
       const bool adjacent = (j == i + 1) || (i == 0 && j == n - 1);
       if (adjacent) continue;  // share exactly one vertex (spikes were rejected earlier)
       const Point& c = vertices_[j];
       const Point& d = vertices_[(j + 1) % n];
-      if (!boxesTouch(edgeBox, segmentBounds(c, d))) continue;
+      if (!segmentBoxesTouch(a, b, c, d)) continue;
       if (intersectSegments(a, b, c, d).kind != SegmentIntersection::Kind::None) {
         throw std::invalid_argument("polygon is not simple: edge " + describe(a) + "-" +
                                     describe(b) + " meets edge " + describe(c) + "-" +

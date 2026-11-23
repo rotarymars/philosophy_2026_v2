@@ -1,2 +1,6 @@
 build/
 *.svg
+
+# libtorch is downloaded into the repo by scripts/fetch_libtorch.sh (~2 GB)
+/libtorch/
+/libtorch-*.zip

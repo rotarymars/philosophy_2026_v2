@@ -28,8 +28,7 @@ bool boundaryRevealsOverlap(const Polygon& p, const Polygon& q) {
   for (std::size_t i = 0; i < n; ++i) {
     const Point& a = pv[i];
     const Point& b = pv[(i + 1) % n];
-    const Box edgeBox = segmentBounds(a, b);
-    if (!boxesTouch(edgeBox, q.bounds())) continue;  // entirely outside q
+    if (!segmentTouchesBox(a, b, q.bounds())) continue;  // entirely outside q
 
     const Point dir = b - a;
     cuts.clear();
@@ -38,7 +37,7 @@ bool boundaryRevealsOverlap(const Polygon& p, const Polygon& q) {
     for (std::size_t j = 0; j < m; ++j) {
       const Point& c = qv[j];
       const Point& d = qv[(j + 1) % m];
-      if (!boxesTouch(edgeBox, segmentBounds(c, d))) continue;
+      if (!segmentBoxesTouch(a, b, c, d)) continue;
       const SegmentIntersection x = intersectSegments(a, b, c, d);
       if (x.kind == SegmentIntersection::Kind::None) continue;
       cuts.emplace_back(dot(x.first - a, dir), x.first);
@@ -86,11 +85,11 @@ bool interiorsOverlap(const Polygon& a, const Polygon& b) {
   for (std::size_t i = 0, n = av.size(); i < n; ++i) {
     const Point& p0 = av[i];
     const Point& p1 = av[(i + 1) % n];
-    const Box edgeBox = segmentBounds(p0, p1);
+    if (!segmentTouchesBox(p0, p1, b.bounds())) continue;
     for (std::size_t j = 0, m = bv.size(); j < m; ++j) {
       const Point& q0 = bv[j];
       const Point& q1 = bv[(j + 1) % m];
-      if (!boxesTouch(edgeBox, segmentBounds(q0, q1))) continue;
+      if (!segmentBoxesTouch(p0, p1, q0, q1)) continue;
       if (segmentsProperlyCross(p0, p1, q0, q1)) return true;
     }
   }

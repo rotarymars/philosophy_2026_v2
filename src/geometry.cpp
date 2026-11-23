@@ -28,6 +28,21 @@ bool boxInteriorsIntersect(const Box& a, const Box& b) {
   return a.min.x < b.max.x && b.min.x < a.max.x && a.min.y < b.max.y && b.min.y < a.max.y;
 }
 
+namespace {
+const Rational& lo(const Rational& a, const Rational& b) { return a < b ? a : b; }
+const Rational& hi(const Rational& a, const Rational& b) { return a < b ? b : a; }
+}  // namespace
+
+bool segmentTouchesBox(const Point& a, const Point& b, const Box& box) {
+  return lo(a.x, b.x) <= box.max.x && box.min.x <= hi(a.x, b.x) &&
+         lo(a.y, b.y) <= box.max.y && box.min.y <= hi(a.y, b.y);
+}
+
+bool segmentBoxesTouch(const Point& a, const Point& b, const Point& c, const Point& d) {
+  return lo(a.x, b.x) <= hi(c.x, d.x) && lo(c.x, d.x) <= hi(a.x, b.x) &&
+         lo(a.y, b.y) <= hi(c.y, d.y) && lo(c.y, d.y) <= hi(a.y, b.y);
+}
+
 bool boxContains(const Box& outer, const Box& inner) {
   return outer.min.x <= inner.min.x && inner.max.x <= outer.max.x &&
          outer.min.y <= inner.min.y && inner.max.y <= outer.max.y;

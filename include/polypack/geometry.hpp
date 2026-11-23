@@ -55,6 +55,10 @@ bool boxesTouch(const Box& a, const Box& b);
 // Open interiors intersect (touching does NOT count).
 bool boxInteriorsIntersect(const Box& a, const Box& b);
 
+// Allocation-free versions of boxesTouch(segmentBounds(...), ...) for hot loops.
+bool segmentTouchesBox(const Point& a, const Point& b, const Box& box);
+bool segmentBoxesTouch(const Point& a, const Point& b, const Point& c, const Point& d);
+
 // `inner` lies inside the closed box `outer`.
 bool boxContains(const Box& outer, const Box& inner);
 
