@@ -77,8 +77,12 @@ class PackingEnv {
 
   explicit PackingEnv(EnvConfig config);
 
-  // Starts a new episode; the item sequence is fully determined by `seed`.
+  // Starts a new episode; the item sequence is fully determined by `seed`
+  // (it is exactly episodeItems(config, seed)).
   void reset(std::uint64_t seed);
+  // Starts a new episode whose items arrive in exactly this order (used by
+  // the offline packer). Requires items.size() == itemsPerEpisode.
+  void resetWithItems(std::vector<Polygon> items);
 
   const EnvConfig& config() const noexcept { return config_; }
   int slots() const noexcept { return config_.openBins + 1; }
@@ -158,6 +162,7 @@ class PackingEnv {
   std::vector<Rotation> rotations_;
   std::vector<Rational> cellOffset_;  // g / grid for g = 0..grid-1
   std::mt19937_64 rng_;
+  std::vector<Polygon> fixedItems_;  // non-empty: items come from here, not from rng_
   std::deque<OpenBin> open_;
   std::vector<Bin> closed_;
   std::optional<Polygon> item_;
@@ -170,6 +175,9 @@ class PackingEnv {
   int binsUsed_ = 0;
   bool done_ = true;
 };
+
+// The items an episode with this seed delivers, in arrival order.
+std::vector<Polygon> episodeItems(const EnvConfig& config, std::uint64_t seed);
 
 // Baselines (no learning), useful as references.
 // First legal action in index order: oldest bin first, rotation 0 first, then

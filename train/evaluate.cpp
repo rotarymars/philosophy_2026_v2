@@ -2,11 +2,17 @@
 // re-verifies every final packing with the exact overlap test, and can write
 // SVG pictures of the bins.
 //
+// Score of a player on an episode = bins it used / bins of the offline
+// reference packing (which sees all items first and tries many packing
+// patterns; see polypack/offline.hpp). The reported score is the mean over
+// episodes; lower is better, 1.0 means as good as the offline reference.
+//
 //   ./polypack_evaluate --model models/policy.pt --episodes 32 --svg-dir eval_svg
 
 #include "common.hpp"
 
 #include "polypack/env.hpp"
+#include "polypack/offline.hpp"
 #include "polypack/overlap.hpp"
 
 #include <filesystem>
@@ -22,6 +28,10 @@ namespace {
 
 const char* kUsage = R"(polypack_evaluate: compare a trained policy with baselines
 
+Score = mean over episodes of (bins used / bins of the offline reference
+packing, which sees every item first and tries many packing patterns).
+Lower is better; 1.0 = as good as the offline reference.
+
   --model PATH           checkpoint (default models/policy.pt)
   --episodes N           number of episodes (default 32)
   --seed-base N          episode i uses seed N + i (default 1000000007, the
@@ -30,6 +40,8 @@ const char* kUsage = R"(polypack_evaluate: compare a trained policy with baselin
   --device NAME          auto | cpu | cuda | cuda:N (default auto)
   --threads N            CPU threads (default: all cores)
   --greedy-baseline      also run the bottom-left-fill greedy baseline
+  --offline-patterns N   packing patterns the offline reference tries per
+                         episode (default 16)
   --sample               sample from the policy instead of taking the argmax
   --svg-dir DIR          write SVGs of the policy's bins for the first episodes
   --svg-episodes N       how many episodes to draw (default 1)
@@ -92,6 +104,14 @@ double meanBins(const std::vector<PackingEnv>& envs) {
   return sum / static_cast<double>(envs.size());
 }
 
+double meanScore(const std::vector<PackingEnv>& envs, const std::vector<OfflineResult>& offline) {
+  double sum = 0;
+  for (std::size_t i = 0; i < envs.size(); ++i) {
+    sum += static_cast<double>(envs[i].binsUsed()) / offline[i].bins;
+  }
+  return sum / static_cast<double>(envs.size());
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -110,6 +130,7 @@ int main(int argc, char** argv) {
     args.str("greedy-baseline", "");
     const bool sample = args.has("sample");
     args.str("sample", "");
+    const int offlinePatterns = static_cast<int>(args.integer("offline-patterns", kDefaultOfflinePatterns));
     const std::string svgDir = args.str("svg-dir", "");
     const int svgEpisodes = static_cast<int>(args.integer("svg-episodes", 1));
     args.rejectUnknown();
@@ -130,23 +151,42 @@ int main(int argc, char** argv) {
       greedyRun = play(Player::Greedy, nullptr, meta.env, seedBase, episodes, false, device, threads);
     }
 
-    std::cout << "\nepisode  policy  first-fit" << (greedy ? "  greedy" : "") << "  area-lower-bound\n";
+    const std::vector<OfflineResult> offline =
+        packOfflineEpisodes(meta.env, seedBase, episodes, offlinePatterns, threads);
+
+    std::cout << "\nbins used per episode\n"
+              << "episode  policy  first-fit" << (greedy ? "  greedy" : "")
+              << "  offline  area-lower-bound  offline pattern\n";
     bool allValid = true;
+    int proven = 0;
     for (int i = 0; i < episodes; ++i) {
       const auto k = static_cast<std::size_t>(i);
       std::cout << std::setw(7) << i << std::setw(8) << policy[k].binsUsed() << std::setw(11)
                 << firstFit[k].binsUsed();
       if (greedy) std::cout << std::setw(8) << greedyRun[k].binsUsed();
-      std::cout << std::setw(18) << policy[k].areaLowerBound() << '\n';
+      std::cout << std::setw(9) << offline[k].bins << std::setw(18) << offline[k].lowerBound << "  "
+                << offline[k].pattern << '\n';
       allValid = allValid && verify(policy[k]);
+      if (offline[k].bins == offline[k].lowerBound) ++proven;
     }
-    double bound = 0;
-    for (const PackingEnv& e : policy) bound += e.areaLowerBound();
+    double bound = 0, offlineMean = 0;
+    for (const OfflineResult& r : offline) {
+      bound += r.lowerBound;
+      offlineMean += r.bins;
+    }
     bound /= episodes;
-    std::cout << std::fixed << std::setprecision(3) << "\nmean    " << meanBins(policy) << "  "
-              << meanBins(firstFit);
-    if (greedy) std::cout << "  " << meanBins(greedyRun);
-    std::cout << "  " << bound << '\n';
+    offlineMean /= episodes;
+    std::cout << std::fixed << std::setprecision(3) << "   mean" << std::setw(8) << meanBins(policy)
+              << std::setw(11) << meanBins(firstFit);
+    if (greedy) std::cout << std::setw(8) << meanBins(greedyRun);
+    std::cout << std::setw(9) << offlineMean << std::setw(18) << bound << '\n';
+
+    std::cout << "\nscore = mean(bins used / offline bins), lower is better\n"
+              << "  policy     " << meanScore(policy, offline) << '\n'
+              << "  first-fit  " << meanScore(firstFit, offline) << '\n';
+    if (greedy) std::cout << "  greedy     " << meanScore(greedyRun, offline) << '\n';
+    std::cout << "offline reference is proven optimal (= area lower bound) on " << proven << " of "
+              << episodes << " episodes\n";
     std::cout << "exact re-check of every policy packing: " << (allValid ? "OK, no overlaps" : "FAILED")
               << '\n';
 

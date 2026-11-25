@@ -23,7 +23,7 @@ ModelConfig modelConfigFor(const PackingEnv& env, int channels) {
 
 namespace {
 
-constexpr int64_t kFormatVersion = 2;  // 2 = free placement
+constexpr int64_t kFormatVersion = 3;  // 2 = free placement, 3 = score is bins / offline bins
 
 void putInt(torch::serialize::OutputArchive& a, const std::string& key, int64_t v) {
   a.write("meta." + key, torch::tensor(v, torch::kInt64));
@@ -68,7 +68,7 @@ void saveCheckpoint(const std::string& path, PolicyNet& model, torch::optim::Opt
   putInt(archive, "model.channels", meta.model.channels);
   putInt(archive, "iteration", meta.iteration);
   putInt(archive, "envSteps", meta.envSteps);
-  putReal(archive, "bestEvalBins", meta.bestEvalBins);
+  putReal(archive, "bestEvalScore", meta.bestEvalScore);
 
   torch::serialize::OutputArchive weights;
   model->save(weights);
@@ -90,7 +90,8 @@ void saveCheckpoint(const std::string& path, PolicyNet& model, torch::optim::Opt
 CheckpointMeta loadCheckpointMeta(const std::string& path) {
   torch::serialize::InputArchive archive;
   archive.load_from(path);
-  if (getInt(archive, "format") != kFormatVersion) {
+  const int64_t format = getInt(archive, "format");
+  if (format != kFormatVersion && format != 2) {
     throw std::runtime_error("unsupported checkpoint format in " + path +
                              " (checkpoints from the old top-drop version cannot be loaded)");
   }
@@ -115,7 +116,9 @@ CheckpointMeta loadCheckpointMeta(const std::string& path) {
   m.model.channels = static_cast<int>(getInt(archive, "model.channels"));
   m.iteration = getInt(archive, "iteration");
   m.envSteps = getInt(archive, "envSteps");
-  m.bestEvalBins = getReal(archive, "bestEvalBins");
+  // Format 2 stored the best mean bin count, which is not comparable with the
+  // new score: start the best-score tracking afresh.
+  m.bestEvalScore = format == 2 ? 1e30 : getReal(archive, "bestEvalScore");
   return m;
 }
 

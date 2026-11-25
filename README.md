@@ -44,29 +44,40 @@ To fetch libtorch on its own, run `scripts/fetch_libtorch.sh [cpu|cu124|...]`. C
 
 A CUDA libtorch also needs the NVIDIA driver and a CUDA toolkit (`nvcc`). The setup script warns if either is missing.
 
-## Training on an NVIDIA GPU
+## Training
 
-1. Run `scripts/setup.sh` on the GPU machine.
-2. Train from the repository root, so that checkpoints land in `models/`:
+1. Run `scripts/setup.sh` once on the training machine. It uses CUDA automatically if an NVIDIA GPU is visible.
+2. Start training from the repository root:
    ```sh
-   ./build/polypack_train --iterations 2000          # uses the GPU automatically
-   ./build/polypack_train --help                     # all options
-   ./build/polypack_train --resume models/policy_latest.pt --iterations 1000
+   scripts/train.sh                      # new run in the background, output in models/train.out
+   scripts/train.sh --iterations 500     # extra options go to polypack_train
+   scripts/train.sh --resume             # continue from models/policy_latest.pt
+   tail -f models/train.out              # watch
+   pkill -f polypack_train               # stop
    ```
+   The script rebuilds first, so pulled code is picked up. Its defaults are `--channels 32 --iterations 200 --eval-every 5`; `./build/polypack_train --help` lists every option. Each minibatch's backward pass runs in pieces of `--micro-batch` samples (default 32): the update is the same, and it fits on small GPUs (a 256-sample minibatch at once needs several GB).
+
    Training writes these files:
-   * `models/policy.pt`: the best model so far, judged on 32 fixed evaluation episodes
+   * `models/policy.pt`: the best model so far, judged by the score on 32 fixed evaluation episodes
    * `models/policy_latest.pt`: the most recent state, including optimizer state, for `--resume`
    * `models/policy_log.csv`: per-iteration metrics
+   * `models/train.out`: the console output
 
    Each checkpoint stores its environment and model settings, so it loads on CPU or GPU without extra flags.
 3. Evaluate against the baselines and draw the bins:
    ```sh
-   ./build/polypack_evaluate --model models/policy.pt --episodes 64 --svg-dir eval_svg
-   ./build/polypack_evaluate --model models/policy.pt --seed-base 42 --greedy-baseline
+   ./build/polypack_evaluate --model models/policy.pt --seed-base 42 --episodes 64 --greedy-baseline
+   ./build/polypack_evaluate --model models/policy.pt --svg-dir eval_svg
    ```
-   The evaluator also re-checks every packing with the exact overlap test.
+   Use a `--seed-base` other than the default for an honest test: the default episodes are the ones the trainer picks its best model on. The evaluator also re-checks every packing with the exact overlap test.
 
-Each environment step runs exact geometry on the CPU, spread over `--threads`. The GPU runs the network. A CPU-only libtorch build works too, just slowly.
+### Score
+
+For each episode, an offline reference packs the same items while seeing all of them in advance and keeping every bin open. It tries many packing patterns and keeps the fewest bins:
+* item orders: largest area first, largest diameter first, largest bounding box first, arrival order, and seeded "noisy area" orders,
+* bin choice: first fit or best fit, each piece placed bottom-left.
+
+**score = mean over episodes of (bins used ÷ offline bins)**. Lower is better; 1.0 means as good as the offline reference. The exact optimum is too hard to compute, so the reference is the best packing found: below 1.0 is possible, though rare. When the reference equals ⌈total area⌉ it is proven optimal, and the evaluator reports how often that happens. `--offline-patterns N` sets how many patterns are tried (default 16; it stops early once a packing reaches the lower bound).
 
 ## The learning problem
 
@@ -74,7 +85,7 @@ Each environment step runs exact geometry on the CPU, spread over `--threads`. T
 * **Bins:** two bins stay open at a time (the bounded-space variant). Opening a third closes the oldest for good.
 * **Action:** `(slot, rotation, gx, gy)`, with 3 slots × 8 rotations × 16 × 16 spots = 6,144 actions. Slot 2 means "open a new bin". The 8 rotations are multiples of 90°, plus each of those plus about 45.24° (the exact 5-12-13 rotation). The piece's bounding box starts at `(gx/16, gy/16)`. A spot is legal only if the piece fits there without overlapping anything; every spot is checked exactly each step, with exact shortcuts that skip far-away pieces.
 * **What the network sees:** for each (bin, rotation) pair, the bin as a 32×32 picture, a "contact" picture (how snugly the piece would sit at each spot), the exact legality mask, and a thumbnail of the piece. It outputs one score per spot.
-* **Reward:** −1 for every bin opened, so the return is −(bins used). The tools also report a lower bound on bins: ⌈total item area⌉.
+* **Reward:** −1 for every bin opened, so the return is −(bins used). The model is scored differently (see [Score](#score)).
 
 ## Live viewer
 

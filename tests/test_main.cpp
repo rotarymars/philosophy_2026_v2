@@ -445,6 +445,72 @@ void testBin() {
   CHECK(bin.toSvg().find("<svg") == 0);
 }
 
+void testOffline() {
+  EnvConfig config;
+  config.itemsPerEpisode = 30;
+
+  // episodeItems reproduces the online item sequence exactly.
+  PackingEnv env(config);
+  env.reset(5);
+  const std::vector<Polygon> items = episodeItems(config, 5);
+  CHECK(items.size() == 30);
+  int k = 0;
+  while (!env.done()) {
+    CHECK(env.currentItem() == items[static_cast<std::size_t>(k)]);
+    ++k;
+    env.step(greedyBottomLeftAction(env));
+  }
+  CHECK(k == 30);
+
+  // resetWithItems feeds exactly those items, in that order.
+  PackingEnv fixed(config);
+  fixed.resetWithItems(items);
+  CHECK(fixed.currentItem() == items[0]);
+  CHECK_THROWS(fixed.resetWithItems(std::vector<Polygon>(items.begin(), items.begin() + 3)));
+
+  for (std::uint64_t seed : {5ULL, 11ULL, 1000000007ULL}) {
+    const OfflineResult r = packOfflineEpisode(config, seed);
+    const std::vector<Polygon> its = episodeItems(config, seed);
+    CHECK(r.bins == static_cast<int>(r.packing.size()));
+    CHECK(r.bins >= r.lowerBound);
+    CHECK(r.lowerBound >= 1);
+    CHECK(!r.pattern.empty());
+    CHECK(r.patternsTried >= 1 && r.patternsTried <= kDefaultOfflinePatterns);
+    // Every item is packed exactly once (up to rotation/translation: compare
+    // areas as a multiset) and the packing is valid.
+    std::vector<Rational> want, got;
+    for (const Polygon& p : its) want.push_back(p.area());
+    for (const Bin& b : r.packing) {
+      const std::vector<Polygon>& in = b.items();
+      CHECK(!in.empty());
+      for (std::size_t i = 0; i < in.size(); ++i) {
+        got.push_back(in[i].area());
+        CHECK(isContainedIn(in[i], b.bounds()));
+        for (std::size_t j = i + 1; j < in.size(); ++j) CHECK(!interiorsOverlap(in[i], in[j]));
+      }
+    }
+    std::sort(want.begin(), want.end());
+    std::sort(got.begin(), got.end());
+    CHECK(want == got);
+    // Offline sees everything and never closes bins: never worse than the
+    // bounded-space greedy player on the same episode.
+    PackingEnv online(config);
+    online.reset(seed);
+    while (!online.done()) online.step(greedyBottomLeftAction(online));
+    CHECK(r.bins <= online.binsUsed());
+  }
+
+  // The threaded batch version gives the same answers as one at a time.
+  const std::vector<OfflineResult> batch = packOfflineEpisodes(config, 20, 6, 6, 4);
+  CHECK(batch.size() == 6);
+  for (int i = 0; i < 6; ++i) {
+    const OfflineResult one = packOfflineEpisode(config, 20 + static_cast<std::uint64_t>(i), 6);
+    CHECK(batch[static_cast<std::size_t>(i)].bins == one.bins);
+    CHECK(batch[static_cast<std::size_t>(i)].pattern == one.pattern);
+    CHECK(batch[static_cast<std::size_t>(i)].lowerBound == one.lowerBound);
+  }
+}
+
 }  // namespace
 
 int main() {
@@ -459,6 +525,7 @@ int main() {
       {"generator", testGenerator},
       {"slide", testSlide},
       {"environment", testEnv},
+      {"offline packer", testOffline},
   };
   for (const auto& [name, fn] : tests) {
     std::cout << "[ RUN  ] " << name << '\n';

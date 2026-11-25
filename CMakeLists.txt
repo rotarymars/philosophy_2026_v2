@@ -45,6 +45,7 @@ add_library(polypack
   src/slide.cpp
   src/raster.cpp
   src/env.cpp
+  src/offline.cpp
 )
 add_library(polypack::polypack ALIAS polypack)
 target_include_directories(polypack PUBLIC

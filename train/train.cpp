@@ -10,6 +10,7 @@
 #include "common.hpp"
 
 #include "polypack/env.hpp"
+#include "polypack/offline.hpp"
 
 #include <chrono>
 #include <filesystem>
@@ -45,10 +46,14 @@ Run
   --seed N                                                  (default 1)
   --eval-every N          evaluate/save every N iterations  (default 10)
   --eval-episodes N       fixed evaluation episodes         (default 32)
+  --offline-patterns N    packing patterns the offline reference tries
+                          per evaluation episode            (default 16)
 
 PPO
   --lr X (3e-4)  --gamma X (1.0)  --lambda X (0.95)  --clip X (0.2)
   --epochs N (4)  --minibatch N (256)  --value-coef X (0.5)
+  --micro-batch N (32)    split each minibatch into pieces of N samples for
+                          the backward pass (same update, less GPU memory)
   --entropy-coef X (0.01)  --max-grad-norm X (0.5)
 
 Environment (new runs only)
@@ -62,14 +67,16 @@ Model (new runs only)
 )";
 
 struct EvalResult {
+  double meanRatio = 0;  // mean of (bins used / offline reference bins): the score, lower is better
   double meanBins = 0;
   double meanLowerBound = 0;
 };
 
 // Plays the same fixed-seed episodes every time. model == nullptr plays the
-// first-fit baseline instead.
+// first-fit baseline instead. offlineBins[i] is the offline reference for
+// episode i (see polypack/offline.hpp).
 EvalResult evaluate(PolicyNet* model, const EnvConfig& config, int episodes,
-                    const torch::Device& device, int threads) {
+                    const std::vector<int>& offlineBins, const torch::Device& device, int threads) {
   std::vector<PackingEnv> envs(static_cast<std::size_t>(episodes), PackingEnv(config));
   parallelFor(episodes, threads, [&](int i) { envs[static_cast<std::size_t>(i)].reset(kEvalSeedBase + i); });
   ObsBatch obs = ObsBatch::allocate(envs[0], episodes);
@@ -94,10 +101,13 @@ EvalResult evaluate(PolicyNet* model, const EnvConfig& config, int episodes,
   }
 
   EvalResult result;
-  for (const PackingEnv& env : envs) {
+  for (std::size_t i = 0; i < envs.size(); ++i) {
+    const PackingEnv& env = envs[i];
+    result.meanRatio += static_cast<double>(env.binsUsed()) / offlineBins[i];
     result.meanBins += env.binsUsed();
     result.meanLowerBound += env.areaLowerBound();
   }
+  result.meanRatio /= episodes;
   result.meanBins /= episodes;
   result.meanLowerBound /= episodes;
   return result;
@@ -132,6 +142,7 @@ int main(int argc, char** argv) {
     const uint64_t seed = static_cast<uint64_t>(args.integer("seed", 1));
     const int evalEvery = static_cast<int>(args.integer("eval-every", 10));
     const int evalEpisodes = static_cast<int>(args.integer("eval-episodes", 32));
+    const int offlinePatterns = static_cast<int>(args.integer("offline-patterns", kDefaultOfflinePatterns));
 
     const double lr = args.real("lr", 3e-4);
     const double gamma = args.real("gamma", 1.0);
@@ -139,6 +150,8 @@ int main(int argc, char** argv) {
     const double clip = args.real("clip", 0.2);
     const int epochs = static_cast<int>(args.integer("epochs", 4));
     const int minibatch = static_cast<int>(args.integer("minibatch", 256));
+    const int microBatch = static_cast<int>(args.integer("micro-batch", 32));
+    if (minibatch < 1 || microBatch < 1) throw std::invalid_argument("--minibatch and --micro-batch must be >= 1");
     const double valueCoef = args.real("value-coef", 0.5);
     const double entropyCoef = args.real("entropy-coef", 0.01);
     const double maxGradNorm = args.real("max-grad-norm", 0.5);
@@ -182,10 +195,20 @@ int main(int argc, char** argv) {
               << prototype.rotations() << " rotations x " << prototype.grid() << "x" << prototype.grid()
               << " spots" << (envConfig.settle ? ", settling" : ", no settling") << ")\n";
 
-    const EvalResult baseline = evaluate(nullptr, envConfig, evalEpisodes, device, threads);
-    std::cout << std::fixed << std::setprecision(3) << "First-fit baseline on " << evalEpisodes
-              << " eval episodes: " << baseline.meanBins << " bins (area lower bound "
-              << baseline.meanLowerBound << ")\n";
+    std::cout << "Offline reference for " << evalEpisodes << " eval episodes (" << offlinePatterns
+              << " packing patterns each)..." << std::flush;
+    std::vector<int> offlineBins;
+    for (const OfflineResult& r : packOfflineEpisodes(envConfig, kEvalSeedBase, evalEpisodes, offlinePatterns, threads)) {
+      offlineBins.push_back(r.bins);
+    }
+    double meanOffline = 0;
+    for (int b : offlineBins) meanOffline += b;
+    meanOffline /= evalEpisodes;
+    const EvalResult baseline = evaluate(nullptr, envConfig, evalEpisodes, offlineBins, device, threads);
+    std::cout << std::fixed << std::setprecision(3) << " " << meanOffline << " bins\n"
+              << "Score = mean(bins used / offline bins), lower is better, 1.0 = matches offline\n"
+              << "First-fit baseline: score " << baseline.meanRatio << " (" << baseline.meanBins
+              << " bins, area lower bound " << baseline.meanLowerBound << ")\n";
 
     const bool appendLog = !resumePath.empty() && std::filesystem::exists(logPath);
     if (std::filesystem::path(logPath).has_parent_path()) {
@@ -194,7 +217,7 @@ int main(int argc, char** argv) {
     std::ofstream log(logPath, appendLog ? std::ios::app : std::ios::trunc);
     if (!appendLog) {
       log << "iteration,env_steps,episodes,mean_bins,mean_lower_bound,policy_loss,value_loss,"
-             "entropy,approx_kl,eval_bins,baseline_bins,seconds\n";
+             "entropy,approx_kl,eval_score,eval_bins,baseline_score,baseline_bins,offline_bins,seconds\n";
     }
 
     std::vector<PackingEnv> envs(static_cast<std::size_t>(numEnvs), prototype);
@@ -294,29 +317,42 @@ int main(int argc, char** argv) {
       for (int epoch = 0; epoch < epochs; ++epoch) {
         const torch::Tensor perm = torch::randperm(total, torch::TensorOptions().dtype(torch::kInt64).device(device));
         for (int64_t start = 0; start < total; start += minibatch) {
-          const torch::Tensor idx = perm.slice(0, start, std::min(start + minibatch, total));
-          const ObsBatch mb = batch.index(idx);
-          const PolicyOutput out = runModel(model, mb);
-          const torch::Tensor logp = torch::log_softmax(maskLogits(out.logits, mb.mask), 1);
-          const torch::Tensor newLogp = logp.gather(1, bActions.index_select(0, idx).unsqueeze(1)).squeeze(1);
-          const torch::Tensor entropy = -(logp.exp() * logp).sum(1).mean();
-          const torch::Tensor oldLp = bOldLogp.index_select(0, idx);
-          const torch::Tensor adv = bAdv.index_select(0, idx);
-          const torch::Tensor ratio = (newLogp - oldLp).exp();
-          const torch::Tensor policyLoss =
-              -torch::min(ratio * adv, ratio.clamp(1.0 - clip, 1.0 + clip) * adv).mean();
-          const torch::Tensor valueLoss = 0.5 * (out.value - bReturns.index_select(0, idx)).pow(2).mean();
-          const torch::Tensor loss = policyLoss + valueCoef * valueLoss - entropyCoef * entropy;
-
+          const int64_t end = std::min(start + minibatch, total);
+          const double mbSize = static_cast<double>(end - start);
+          // Gradient accumulation: each piece contributes its share of the
+          // minibatch means, so the update equals one full-minibatch step
+          // while only `microBatch` samples' activations are in memory.
           optimizer.zero_grad();
-          loss.backward();
+          double policyLossMb = 0, valueLossMb = 0, entropyMb = 0, klMb = 0;
+          for (int64_t ms = start; ms < end; ms += microBatch) {
+            const torch::Tensor idx = perm.slice(0, ms, std::min(ms + microBatch, end));
+            const double share = static_cast<double>(idx.size(0)) / mbSize;
+            const ObsBatch mb = batch.index(idx);
+            const PolicyOutput out = runModel(model, mb);
+            const torch::Tensor logp = torch::log_softmax(maskLogits(out.logits, mb.mask), 1);
+            const torch::Tensor newLogp = logp.gather(1, bActions.index_select(0, idx).unsqueeze(1)).squeeze(1);
+            const torch::Tensor entropy = -(logp.exp() * logp).sum(1).mean();
+            const torch::Tensor oldLp = bOldLogp.index_select(0, idx);
+            const torch::Tensor adv = bAdv.index_select(0, idx);
+            const torch::Tensor ratio = (newLogp - oldLp).exp();
+            const torch::Tensor policyLoss =
+                -torch::min(ratio * adv, ratio.clamp(1.0 - clip, 1.0 + clip) * adv).mean();
+            const torch::Tensor valueLoss = 0.5 * (out.value - bReturns.index_select(0, idx)).pow(2).mean();
+            const torch::Tensor loss = policyLoss + valueCoef * valueLoss - entropyCoef * entropy;
+            (loss * share).backward();
+
+            policyLossMb += share * policyLoss.item<double>();
+            valueLossMb += share * valueLoss.item<double>();
+            entropyMb += share * entropy.item<double>();
+            klMb += share * (oldLp - newLogp).mean().item<double>();
+          }
           torch::nn::utils::clip_grad_norm_(model->parameters(), maxGradNorm);
           optimizer.step();
 
-          policyLossSum += policyLoss.item<double>();
-          valueLossSum += valueLoss.item<double>();
-          entropySum += entropy.item<double>();
-          klSum += (oldLp - newLogp).mean().item<double>();
+          policyLossSum += policyLossMb;
+          valueLossSum += valueLossMb;
+          entropySum += entropyMb;
+          klSum += klMb;
           ++updates;
         }
       }
@@ -339,18 +375,20 @@ int main(int argc, char** argv) {
       }
 
       std::string evalText = "";
-      double evalBins = -1;
+      double evalScore = -1, evalBins = -1;
       if (iter % evalEvery == 0 || iter == firstIteration + iterations - 1) {
-        evalBins = evaluate(&model, envConfig, evalEpisodes, device, threads).meanBins;
-        const bool improved = evalBins < meta.bestEvalBins;
+        const EvalResult e = evaluate(&model, envConfig, evalEpisodes, offlineBins, device, threads);
+        evalScore = e.meanRatio;
+        evalBins = e.meanBins;
+        const bool improved = evalScore < meta.bestEvalScore;
         if (improved) {
-          meta.bestEvalBins = evalBins;
+          meta.bestEvalScore = evalScore;
           saveCheckpoint(outPath, model, &optimizer, meta);
         }
         saveCheckpoint(latestPath, model, &optimizer, meta);
         std::ostringstream s;
-        s << std::fixed << std::setprecision(3) << " | eval " << evalBins << " bins (first-fit "
-          << baseline.meanBins << ")" << (improved ? " * saved best" : "");
+        s << std::fixed << std::setprecision(3) << " | eval score " << evalScore << " (" << evalBins
+          << " bins; first-fit " << baseline.meanRatio << ")" << (improved ? " * saved best" : "");
         evalText = s.str();
       }
 
@@ -361,12 +399,12 @@ int main(int argc, char** argv) {
                 << "s learn " << learnSeconds << "s" << evalText << std::endl;
       log << iter << ',' << meta.envSteps << ',' << finishedBins.size() << ',' << meanBins << ','
           << meanBound << ',' << policyLossSum / updates << ',' << valueLossSum / updates << ','
-          << entropySum / updates << ',' << klSum / updates << ',' << evalBins << ','
-          << baseline.meanBins << ',' << elapsed << '\n';
+          << entropySum / updates << ',' << klSum / updates << ',' << evalScore << ',' << evalBins << ','
+          << baseline.meanRatio << ',' << baseline.meanBins << ',' << meanOffline << ',' << elapsed << '\n';
       log.flush();
     }
 
-    std::cout << "Done. Best eval " << meta.bestEvalBins << " bins; best model: " << outPath
+    std::cout << "Done. Best eval score " << meta.bestEvalScore << "; best model: " << outPath
               << ", latest: " << latestPath << ", log: " << logPath << '\n';
     return 0;
   } catch (const std::exception& e) {

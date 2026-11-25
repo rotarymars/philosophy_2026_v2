@@ -62,6 +62,7 @@ PackingEnv::PackingEnv(EnvConfig config)
 
 void PackingEnv::reset(std::uint64_t seed) {
   rng_.seed(seed);
+  fixedItems_.clear();
   open_.clear();
   closed_.clear();
   areaSeen_ = 0;
@@ -69,6 +70,31 @@ void PackingEnv::reset(std::uint64_t seed) {
   binsUsed_ = 0;
   done_ = false;
   nextItem();
+}
+
+void PackingEnv::resetWithItems(std::vector<Polygon> items) {
+  if (static_cast<int>(items.size()) != config_.itemsPerEpisode) {
+    throw std::invalid_argument("PackingEnv::resetWithItems: expected " +
+                                std::to_string(config_.itemsPerEpisode) + " items, got " +
+                                std::to_string(items.size()));
+  }
+  fixedItems_ = std::move(items);
+  open_.clear();
+  closed_.clear();
+  areaSeen_ = 0;
+  placed_ = 0;
+  binsUsed_ = 0;
+  done_ = false;
+  nextItem();
+}
+
+std::vector<Polygon> episodeItems(const EnvConfig& config, std::uint64_t seed) {
+  // Must match PackingEnv::reset + nextItem: one randomPolygon call per item.
+  std::mt19937_64 rng(seed);
+  std::vector<Polygon> items;
+  items.reserve(static_cast<std::size_t>(config.itemsPerEpisode));
+  for (int i = 0; i < config.itemsPerEpisode; ++i) items.push_back(randomPolygon(rng, config.generator));
+  return items;
 }
 
 const Polygon& PackingEnv::currentItem() const {
@@ -107,7 +133,8 @@ int PackingEnv::lastFittingCell(const Rational& extent) const {
 }
 
 void PackingEnv::nextItem() {
-  item_ = randomPolygon(rng_, config_.generator);
+  item_ = fixedItems_.empty() ? randomPolygon(rng_, config_.generator)
+                              : fixedItems_[static_cast<std::size_t>(placed_)];
   areaSeen_ += item_->area();
 
   const int size = config_.rasterSize;

@@ -27,7 +27,7 @@ struct CheckpointMeta {
   ModelConfig model;
   int64_t iteration = 0;
   int64_t envSteps = 0;
-  double bestEvalBins = 1e30;
+  double bestEvalScore = 1e30;  // best mean (bins / offline bins) so far
 };
 
 ModelConfig modelConfigFor(const PackingEnv& env, int channels);
