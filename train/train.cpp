@@ -4,7 +4,7 @@
 //   ./polypack_train --resume models/policy_latest.pt --iterations 500
 //   ./polypack_train --help
 //
-// Geometry stays exact: the network only *chooses* (bin, rotation, column).
+// Geometry stays exact: the network only *chooses* (bin, rotation, grid spot).
 // Legality and the final resting position are computed with exact rationals.
 
 #include "common.hpp"
@@ -52,7 +52,8 @@ PPO
   --entropy-coef X (0.01)  --max-grad-norm X (0.5)
 
 Environment (new runs only)
-  --open-bins N (2)  --columns N (16)  --raster N (32)  --items N (60)
+  --open-bins N (2)  --grid N (16)  --raster N (32)  --items N (60)
+  --settle 0|1 (1)        1: slide down/left from the chosen spot; 0: stay exactly there
   --min-vertices N (3)  --max-vertices N (8)
   --min-radius X (0.08)  --max-radius X (0.22)  --inner-ratio X (0.45)
 
@@ -79,7 +80,7 @@ EvalResult evaluate(PolicyNet* model, const EnvConfig& config, int episodes,
       observeAll(envs, obs, threads);
       torch::NoGradGuard noGrad;
       const ObsBatch d = obs.to(device);
-      const PolicyOutput out = (*model)->forward(d.bins, d.items, d.slotF, d.globalF);
+      const PolicyOutput out = runModel(*model, d);
       const torch::Tensor best = maskLogits(out.logits, d.mask).argmax(1).to(torch::kCPU);
       const auto acc = best.accessor<int64_t, 1>();
       for (int i = 0; i < episodes; ++i) actions[static_cast<std::size_t>(i)] = acc[i];
@@ -144,7 +145,8 @@ int main(int argc, char** argv) {
 
     EnvConfig envConfig;
     envConfig.openBins = static_cast<int>(args.integer("open-bins", envConfig.openBins));
-    envConfig.columns = static_cast<int>(args.integer("columns", envConfig.columns));
+    envConfig.grid = static_cast<int>(args.integer("grid", envConfig.grid));
+    envConfig.settle = args.integer("settle", envConfig.settle ? 1 : 0) != 0;
     envConfig.rasterSize = static_cast<int>(args.integer("raster", envConfig.rasterSize));
     envConfig.itemsPerEpisode = static_cast<int>(args.integer("items", envConfig.itemsPerEpisode));
     GeneratorConfig& gen = envConfig.generator;
@@ -177,7 +179,8 @@ int main(int argc, char** argv) {
     for (const torch::Tensor& p : model->parameters()) parameterCount += static_cast<std::size_t>(p.numel());
     std::cout << "Device " << device << ", " << parameterCount << " parameters, "
               << prototype.actionCount() << " actions (" << prototype.slots() << " slots x "
-              << prototype.rotations() << " rotations x " << prototype.columns() << " columns)\n";
+              << prototype.rotations() << " rotations x " << prototype.grid() << "x" << prototype.grid()
+              << " spots" << (envConfig.settle ? ", settling" : ", no settling") << ")\n";
 
     const EvalResult baseline = evaluate(nullptr, envConfig, evalEpisodes, device, threads);
     std::cout << std::fixed << std::setprecision(3) << "First-fit baseline on " << evalEpisodes
@@ -221,7 +224,7 @@ int main(int argc, char** argv) {
         {
           torch::NoGradGuard noGrad;
           const ObsBatch d = obs.to(device);
-          const PolicyOutput out = model->forward(d.bins, d.items, d.slotF, d.globalF);
+          const PolicyOutput out = runModel(model, d);
           const torch::Tensor logp = torch::log_softmax(maskLogits(out.logits, d.mask), 1);
           const torch::Tensor a = torch::multinomial(logp.exp(), 1).squeeze(1);
           actions[t].copy_(a.to(torch::kCPU));
@@ -261,7 +264,7 @@ int main(int argc, char** argv) {
         observeAll(envs, obs, threads);
         torch::NoGradGuard noGrad;
         const ObsBatch d = obs.to(device);
-        lastValue = model->forward(d.bins, d.items, d.slotF, d.globalF).value.to(torch::kCPU);
+        lastValue = runModel(model, d).value.to(torch::kCPU);
       }
       const auto envEnd = std::chrono::steady_clock::now();
 
@@ -293,7 +296,7 @@ int main(int argc, char** argv) {
         for (int64_t start = 0; start < total; start += minibatch) {
           const torch::Tensor idx = perm.slice(0, start, std::min(start + minibatch, total));
           const ObsBatch mb = batch.index(idx);
-          const PolicyOutput out = model->forward(mb.bins, mb.items, mb.slotF, mb.globalF);
+          const PolicyOutput out = runModel(model, mb);
           const torch::Tensor logp = torch::log_softmax(maskLogits(out.logits, mb.mask), 1);
           const torch::Tensor newLogp = logp.gather(1, bActions.index_select(0, idx).unsqueeze(1)).squeeze(1);
           const torch::Tensor entropy = -(logp.exp() * logp).sum(1).mean();

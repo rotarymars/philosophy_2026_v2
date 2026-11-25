@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>polypack live viewer</title>
+<style>
+  :root { --bg:#f6f5f2; --panel:#fff; --ink:#1d1d1f; --mute:#6b6b70; --line:#d9d7d2; --accent:#d4572a; --ok:#2f8f5b; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#17171a; --panel:#222226; --ink:#ececef; --mute:#9a9aa2; --line:#3a3a40; --accent:#ff8a5c; --ok:#5cc58a; }
+  }
+  * { box-sizing:border-box; }
+  [hidden] { display:none !important; }
+  body { margin:0; font:14px/1.4 system-ui, sans-serif; background:var(--bg); color:var(--ink); }
+  header { display:flex; flex-wrap:wrap; gap:12px; align-items:center; padding:12px 16px; border-bottom:1px solid var(--line); background:var(--panel); }
+  header h1 { font-size:16px; margin:0 12px 0 0; }
+  label { color:var(--mute); display:flex; gap:6px; align-items:center; }
+  select, input, button { font:inherit; color:var(--ink); background:var(--bg); border:1px solid var(--line); border-radius:6px; padding:4px 8px; }
+  input[type=number] { width:80px; }
+  button { cursor:pointer; }
+  button.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+  #stats { display:flex; flex-wrap:wrap; gap:20px; padding:10px 16px; color:var(--mute); }
+  #stats b { color:var(--ink); font-variant-numeric:tabular-nums; }
+  #action { padding:0 16px 4px; min-height:22px; }
+  #legend { padding:0 16px 8px; color:var(--mute); font-size:12px; display:flex; gap:16px; flex-wrap:wrap; }
+  .sw { display:inline-block; width:10px; height:10px; border-radius:2px; vertical-align:-1px; margin-right:4px; }
+  #bins { display:flex; flex-wrap:wrap; gap:14px; padding:8px 16px 24px; }
+  .bin { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:8px; }
+  .bin.open { border-color:var(--accent); }
+  .bin .cap { display:flex; justify-content:space-between; font-size:12px; color:var(--mute); margin-bottom:4px; }
+  canvas { display:block; }
+</style>
+</head>
+<body>
+<header>
+  <h1>polypack live</h1>
+  <label>Player <select id="player">
+    <option value="greedy">greedy (bottom-left fill)</option>
+    <option value="firstfit">first fit</option>
+    <option value="policy">trained policy</option>
+  </select></label>
+  <label id="modelWrap" hidden>Model <select id="model"></select></label>
+  <label id="settleWrap"><input id="settle" type="checkbox" checked> slide down/left after placing</label>
+  <label>Seed <input id="seed" type="number" value="1"></label>
+  <label>Speed <input id="speed" type="range" min="0.25" max="8" step="0.25" value="1"><span id="speedOut">1×</span></label>
+  <label><input id="showLegal" type="checkbox" checked> show free spots</label>
+  <button id="start" class="primary">Start</button>
+  <button id="pause">Pause</button>
+</header>
+<div id="stats">
+  <span>Item <b id="sItem">–</b></span>
+  <span>Bins used <b id="sBins">–</b></span>
+  <span>Area lower bound <b id="sLB">–</b></span>
+  <span>Legal moves <b id="sLegal">–</b></span>
+  <span id="status"></span>
+</div>
+<div id="action"></div>
+<div id="legend">
+  <span><span class="sw" style="background:var(--ok);opacity:.5"></span>spots where this piece (this rotation) fits, checked exactly</span>
+  <span id="legProb" hidden><span class="sw" style="background:var(--accent);opacity:.6"></span>network's probability for each spot</span>
+  <span><span class="sw" style="border:2px solid var(--ink)"></span>chosen spot (lower-left corner of the piece's box)</span>
+</div>
+<div id="bins"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const SIZE = 300, PAD = 4;
+const ROT_NAMES = ["0°", "≈45°", "90°", "≈135°", "180°", "≈225°", "270°", "≈315°"];
+
+let es = null, queue = [], bins = [], current = null, paused = false, meta = null;
+
+function hue(i) { return (i * 137.508) % 360; }
+function css(name) { return getComputedStyle(document.body).getPropertyValue(name).trim(); }
+
+function makeBin(index) {
+  const div = document.createElement("div");
+  div.className = "bin";
+  div.innerHTML = `<div class="cap"><span>Bin ${index + 1}</span><span class="fill"></span></div>`;
+  const c = document.createElement("canvas");
+  const dpr = window.devicePixelRatio || 1;
+  const px = SIZE + 2 * PAD;
+  c.width = px * dpr; c.height = px * dpr;
+  c.style.width = px + "px"; c.style.height = px + "px";
+  c.getContext("2d").scale(dpr, dpr);
+  div.appendChild(c);
+  $("bins").appendChild(div);
+  return { div, canvas: c, items: [], fill: 0, closed: false };
+}
+
+function toPx([x, y]) { return [PAD + x * SIZE, PAD + (1 - y) * SIZE]; }
+
+function drawPoly(ctx, pts, fill, stroke, alpha = 1, width = 1) {
+  ctx.beginPath();
+  pts.forEach((p, i) => { const [x, y] = toPx(p); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
+  ctx.closePath();
+  if (fill) { ctx.globalAlpha = alpha; ctx.fillStyle = fill; ctx.fill(); }
+  ctx.globalAlpha = 1; ctx.strokeStyle = stroke; ctx.lineWidth = width; ctx.stroke();
+}
+
+// Grid cell (gx, gy) covers [gx/G, (gx+1)/G] x [gy/G, (gy+1)/G]; its lower-left
+// corner is where the piece's bounding box would start.
+function cellRect(gx, gy) {
+  const G = meta.grid, s = SIZE / G;
+  return [PAD + gx * s, PAD + (G - 1 - gy) * s, s, s];
+}
+
+function drawBin(b, idx) {
+  const ctx = b.canvas.getContext("2d");
+  ctx.clearRect(0, 0, SIZE + 2 * PAD, SIZE + 2 * PAD);
+  ctx.strokeStyle = css("--line"); ctx.lineWidth = 1;
+  ctx.strokeRect(PAD, PAD, SIZE, SIZE);
+
+  const s = current && current.step.targetBin === idx ? current.step : null;
+  if (s && current.phase === "show") {
+    const G = meta.grid;
+    if ($("showLegal").checked) {
+      ctx.fillStyle = css("--ok");
+      for (let k = 0; k < G * G; k++) {
+        if (s.legalMap[k] !== "1") continue;
+        const [x, y, w, h] = cellRect(k % G, Math.floor(k / G));
+        ctx.globalAlpha = 0.22; ctx.fillRect(x + 1, y + 1, w - 2, h - 2);
+      }
+    }
+    if (s.probMap) {
+      const mx = Math.max(...s.probMap, 1e-12);
+      ctx.fillStyle = css("--accent");
+      s.probMap.forEach((p, k) => {
+        if (p <= 0) return;
+        const [x, y, w, h] = cellRect(k % G, Math.floor(k / G));
+        ctx.globalAlpha = 0.75 * Math.sqrt(p / mx); ctx.fillRect(x, y, w, h);
+      });
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  for (const it of b.items) drawPoly(ctx, it.pts, `hsl(${hue(it.n)} 60% 62%)`, `hsl(${hue(it.n)} 45% 35%)`, b.closed ? 0.45 : 0.85);
+
+  if (s) {
+    const [x, y, w, h] = cellRect(s.gx, s.gy);
+    ctx.strokeStyle = css("--ink"); ctx.lineWidth = 2; ctx.strokeRect(x, y, w, h);
+    if (current.phase !== "show") {
+      drawPoly(ctx, s.path[s.path.length - 1], null, css("--mute"), 0, 1);  // where it will rest
+      drawPoly(ctx, current.pts, css("--accent"), css("--ink"), 0.9, 1.5);
+    }
+  }
+  b.div.classList.toggle("open", !b.closed);
+  b.div.querySelector(".fill").textContent = b.items.length ? `${Math.round(b.fill * 100)}% full` : "";
+}
+
+function redrawAll() { bins.forEach(drawBin); }
+
+function lerpPoly(a, b, t) { return a.map((p, i) => [p[0] + (b[i][0] - p[0]) * t, p[1] + (b[i][1] - p[1]) * t]); }
+
+function startStep(step) {
+  while (bins.length <= step.targetBin) bins.push(makeBin(bins.length));
+  bins.forEach((b, i) => b.closed = i < step.openFrom);
+  const segs = [];
+  for (let i = 1; i < step.path.length; i++) {
+    const a = step.path[i - 1][0], b = step.path[i][0];
+    segs.push(Math.hypot(b[0] - a[0], b[1] - a[1]));
+  }
+  // Phases: "show" (free spots and the chosen spot), "place" (piece appears
+  // there), "slide" (settling path).
+  current = { step, segs, seg: 0, t: 0, pts: step.path[0], phase: "show", timer: 0.45 };
+  $("sItem").textContent = `${step.index + 1} / ${meta.items}`;
+  $("sLegal").textContent = step.legalCount;
+  const where = step.newBin ? "a new bin" : `open bin ${step.slot + 1} (Bin ${step.targetBin + 1})`;
+  let txt = `Chosen: ${where}, rotation ${ROT_NAMES[step.rotation] ?? step.rotation}, spot (${step.gx}, ${step.gy})`;
+  if (step.chosenProb !== undefined) txt += ` · p = ${(step.chosenProb * 100).toFixed(1)}%`;
+  if (step.slotProbs) txt += ` · bin choice: ` + step.slotProbs.map((p, i) => `${i === step.slotProbs.length - 1 ? "new" : "open " + (i + 1)} ${(p * 100).toFixed(0)}%`).join(", ");
+  $("action").textContent = txt;
+}
+
+function finishStep() {
+  const s = current.step, b = bins[s.targetBin];
+  b.items.push({ pts: s.path[s.path.length - 1], n: s.index });
+  b.fill = s.fill;
+  $("sBins").textContent = s.binsUsed;
+  $("sLB").textContent = s.lowerBound;
+  current = null;
+}
+
+let last = performance.now();
+function tick(now) {
+  const dt = Math.min(0.1, (now - last) / 1000) * +$("speed").value;
+  last = now;
+  if (!paused) {
+    if (!current && queue.length) {
+      const msg = queue.shift();
+      if (msg.type === "step") startStep(msg);
+      else if (msg.type === "done") { bins.forEach(b => b.closed = false); $("status").textContent = `Done: ${msg.binsUsed} bins (lower bound ${msg.lowerBound})`; }
+    }
+    if (current) {
+      if (current.phase === "show" || current.phase === "place") {
+        current.timer -= dt;
+        if (current.timer <= 0) {
+          if (current.phase === "show") { current.phase = "place"; current.timer = 0.3; }
+          else current.phase = "slide";
+        }
+      } else if (current.seg < current.segs.length) {
+        const speed = 1.4;  // bin widths per second
+        const len = current.segs[current.seg] || 1e-9;
+        current.t += dt * speed / len;
+        const s = current.step;
+        if (current.t >= 1) { current.seg++; current.t = 0; current.pts = s.path[current.seg]; }
+        else current.pts = lerpPoly(s.path[current.seg], s.path[current.seg + 1], current.t);
+      } else finishStep();
+    }
+    redrawAll();
+  }
+  requestAnimationFrame(tick);
+}
+requestAnimationFrame(tick);
+
+function start() {
+  if (es) es.close();
+  queue = []; current = null; bins = []; $("bins").innerHTML = ""; paused = false;
+  $("pause").textContent = "Pause";
+  $("status").textContent = "running…"; $("action").textContent = "";
+  ["sItem", "sBins", "sLB", "sLegal"].forEach(id => $(id).textContent = "–");
+  const p = new URLSearchParams({
+    player: $("player").value, seed: $("seed").value, model: $("model").value || "",
+    settle: $("settle").checked ? "1" : "0",
+  });
+  es = new EventSource("/stream?" + p);
+  es.onmessage = e => {
+    const msg = JSON.parse(e.data);
+    if (msg.type === "start") { meta = msg; $("legProb").hidden = msg.player !== "policy"; }
+    else if (msg.type === "error") { $("status").textContent = "Error: " + msg.message; es.close(); }
+    else { queue.push(msg); if (msg.type === "done") es.close(); }
+  };
+  es.onerror = () => es.close();
+}
+
+$("start").onclick = start;
+$("pause").onclick = () => { paused = !paused; $("pause").textContent = paused ? "Resume" : "Pause"; };
+$("speed").oninput = () => $("speedOut").textContent = $("speed").value + "×";
+$("player").onchange = () => {
+  const policy = $("player").value === "policy";
+  $("modelWrap").hidden = !policy;
+  $("settleWrap").hidden = policy;  // a policy uses the setting it was trained with
+};
+
+fetch("/models").then(r => r.json()).then(list => {
+  $("model").innerHTML = list.length ? list.map(m => `<option>${m}</option>`).join("") : `<option value="">(no models yet)</option>`;
+});
+</script>
+</body>
+</html>

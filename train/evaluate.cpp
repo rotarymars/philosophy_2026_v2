@@ -29,7 +29,7 @@ const char* kUsage = R"(polypack_evaluate: compare a trained policy with baselin
                          unseen episodes)
   --device NAME          auto | cpu | cuda | cuda:N (default auto)
   --threads N            CPU threads (default: all cores)
-  --greedy-baseline      also run the (slow) lowest-landing greedy baseline
+  --greedy-baseline      also run the bottom-left-fill greedy baseline
   --sample               sample from the policy instead of taking the argmax
   --svg-dir DIR          write SVGs of the policy's bins for the first episodes
   --svg-episodes N       how many episodes to draw (default 1)
@@ -51,7 +51,7 @@ std::vector<PackingEnv> play(Player player, PolicyNet* model, const EnvConfig& c
       torch::NoGradGuard noGrad;
       const ObsBatch d = obs.to(device);
       const torch::Tensor logits =
-          maskLogits((*model)->forward(d.bins, d.items, d.slotF, d.globalF).logits, d.mask);
+          maskLogits(runModel(*model, d).logits, d.mask);
       const torch::Tensor chosen =
           (sample ? torch::multinomial(torch::softmax(logits, 1), 1).squeeze(1) : logits.argmax(1))
               .to(torch::kCPU);
@@ -64,7 +64,7 @@ std::vector<PackingEnv> play(Player player, PolicyNet* model, const EnvConfig& c
       switch (player) {
         case Player::Policy: action = static_cast<int>(actions[static_cast<std::size_t>(i)]); break;
         case Player::FirstFit: action = firstFitAction(env); break;
-        case Player::Greedy: action = greedyLowestAction(env); break;
+        case Player::Greedy: action = greedyBottomLeftAction(env); break;
       }
       env.step(action);
     });

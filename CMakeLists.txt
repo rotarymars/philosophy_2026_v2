@@ -82,6 +82,8 @@ if(POLYPACK_BUILD_TRAINING)
     target_link_libraries(polypack_train PRIVATE polypack_train_common)
     add_executable(polypack_evaluate train/evaluate.cpp)
     target_link_libraries(polypack_evaluate PRIVATE polypack_train_common)
+    add_executable(polypack_visualize train/visualize.cpp)
+    target_link_libraries(polypack_visualize PRIVATE polypack_train_common)
   else()
     message(STATUS "libtorch not found: training tools skipped "
                    "(pass -DCMAKE_PREFIX_PATH=/path/to/libtorch to enable)")

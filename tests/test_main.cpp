@@ -322,25 +322,45 @@ bool packingIsValid(const PackingEnv& env) {
   return true;
 }
 
+// The fast mask must agree exactly with the plain definition of legality:
+// the item, put at the grid spot, fits in the bin and overlaps nothing.
+void checkMaskAgainstBruteForce(const PackingEnv& env) {
+  for (int a = 0; a < env.actionCount(); ++a) {
+    const Action act = env.decodeAction(a);
+    if (act.slot == env.config().openBins) continue;  // the new-bin slot is a policy choice
+    const std::vector<Polygon>& items = env.slotItems(act.slot);
+    const std::vector<Bin> bins = env.allBins();
+    if (static_cast<std::size_t>(act.slot) >= std::min<std::size_t>(bins.size(), env.config().openBins)) {
+      CHECK(!env.isLegal(a));  // that bin is not open yet
+      continue;
+    }
+    Bin bin;
+    for (const Polygon& p : items) bin.tryPlace(p);
+    CHECK(env.isLegal(a) == bin.canPlace(env.anchorPlacement(a)));
+  }
+}
+
 void testEnv() {
   EnvConfig config;
   config.itemsPerEpisode = 25;
   PackingEnv env(config);
-  CHECK(env.actionCount() == 3 * 8 * 16);
+  CHECK(env.actionCount() == 3 * 8 * 16 * 16);
+  for (int a : {0, 77, 4095, 6143}) CHECK(env.encodeAction(env.decodeAction(a)) == a);
 
-  // First item: only the "new bin" slot (column 0, any rotation) is legal.
+  // First item: only the "new bin" slot at spot (0, 0), any rotation, is legal.
   env.reset(42);
   for (int a = 0; a < env.actionCount(); ++a) {
-    const bool newBinSlot = a / (env.rotations() * env.columns()) == config.openBins;
-    CHECK(env.isLegal(a) == (newBinSlot && a % env.columns() == 0));
+    const Action act = env.decodeAction(a);
+    CHECK(env.isLegal(a) == (act.slot == config.openBins && act.gx == 0 && act.gy == 0));
   }
   CHECK_THROWS(env.step(0));
 
-  // Random legal play and first-fit play both give exact, valid packings.
+  // Random legal play gives exact, valid packings, and the mask stays exact.
   std::mt19937 rng(3);
   int steps = 0;
   float totalReward = 0;
   while (!env.done()) {
+    if (steps % 6 == 3) checkMaskAgainstBruteForce(env);
     std::vector<int> legal;
     for (int a = 0; a < env.actionCount(); ++a) {
       if (env.isLegal(a)) legal.push_back(a);
@@ -353,27 +373,62 @@ void testEnv() {
   CHECK(-totalReward == static_cast<float>(env.binsUsed()));
   CHECK(env.binsUsed() >= env.areaLowerBound());
 
+  // Baselines: deterministic for a seed and exactly valid. The mask is also
+  // checked on the denser packings they make.
   PackingEnv a(config), b(config);
   a.reset(9);
   b.reset(9);
+  int k = 0;
   while (!a.done()) {
     CHECK(a.currentItem() == b.currentItem());  // same seed, same items
+    if (++k % 8 == 0) checkMaskAgainstBruteForce(b);
     a.step(firstFitAction(a));
-    b.step(firstFitAction(b));
+    b.step(greedyBottomLeftAction(b));
   }
   CHECK(packingIsValid(a));
-  CHECK(a.binsUsed() == b.binsUsed());
+  CHECK(packingIsValid(b));
+
+  // Without settling, the item stays exactly where it was put, and an empty
+  // bin offers every spot where the item fits.
+  EnvConfig free = config;
+  free.settle = false;
+  free.maskThreads = 4;
+  PackingEnv f(free);
+  f.reset(11);
+  int offered = 0;
+  for (int act = 0; act < f.actionCount(); ++act) offered += f.isLegal(act) ? 1 : 0;
+  CHECK(offered > f.rotations());
+  std::mt19937 rng2(5);
+  while (!f.done()) {
+    std::vector<int> legal;
+    for (int act = 0; act < f.actionCount(); ++act) {
+      if (f.isLegal(act)) legal.push_back(act);
+    }
+    const int pick = legal[rng2() % legal.size()];
+    CHECK(f.simulate(pick) == f.anchorPlacement(pick));
+    f.step(pick);
+  }
+  CHECK(packingIsValid(f));
 
   // Observation buffers have the documented sizes and agree with the mask.
   a.reset(5);
   a.step(firstFitAction(a));
   const std::size_t px = static_cast<std::size_t>(a.rasterSize()) * a.rasterSize();
-  std::vector<std::uint8_t> bins(a.slots() * px), items(a.rotations() * px), mask(a.actionCount());
+  std::vector<std::uint8_t> bins(a.slots() * px), items(a.rotations() * px),
+      contact(a.slots() * a.rotations() * px), mask(a.actionCount());
   std::vector<float> slotF(a.slots() * PackingEnv::kSlotFeatures), globalF(PackingEnv::kGlobalFeatures);
-  a.observe(bins.data(), items.data(), slotF.data(), globalF.data(), mask.data());
+  a.observe(bins.data(), items.data(), contact.data(), slotF.data(), globalF.data(), mask.data());
   CHECK(mask == a.mask());
   CHECK(slotF[0] == 1.0f && slotF[1] == 0.0f);  // slot 0 holds the open bin
   CHECK(std::count_if(bins.begin(), bins.begin() + px, [](std::uint8_t v) { return v > 0; }) > 0);
+  // In the empty new-bin slot, the bottom-left corner touches two walls, the
+  // middle of the bin touches nothing.
+  const std::size_t newBin = static_cast<std::size_t>(a.config().openBins) * a.rotations() * px;
+  const int last = a.rasterSize() - 1;
+  CHECK(contact[newBin + static_cast<std::size_t>(last) * a.rasterSize()] > 0);
+  CHECK(contact[newBin + static_cast<std::size_t>(a.rasterSize() / 2) * a.rasterSize() + 2] == 0 ||
+        contact[newBin + static_cast<std::size_t>(a.rasterSize() / 2) * a.rasterSize() + 2] <
+            contact[newBin + static_cast<std::size_t>(last) * a.rasterSize()]);
 }
 
 void testBin() {

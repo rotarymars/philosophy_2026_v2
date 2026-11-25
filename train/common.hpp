@@ -48,6 +48,7 @@ void loadCheckpointWeights(const std::string& path, PolicyNet& model,
 struct ObsBatch {
   torch::Tensor bins;     // [N,S,H,W] uint8
   torch::Tensor items;    // [N,R,H,W] uint8
+  torch::Tensor contact;  // [N,S*R,H,W] uint8
   torch::Tensor slotF;    // [N,S,Fs] float
   torch::Tensor globalF;  // [N,Fg] float
   torch::Tensor mask;     // [N,A] bool
@@ -58,8 +59,14 @@ struct ObsBatch {
   ObsBatch index(const torch::Tensor& indices) const;
 };
 
+// Fills row i of `out` from one environment.
+void observeInto(const PackingEnv& env, ObsBatch& out, int64_t i);
+
 // Fills `out` (allocated for envs.size()) from the environments, in parallel.
 void observeAll(const std::vector<PackingEnv>& envs, ObsBatch& out, int threads);
+
+// Runs the model on a batch that already lives on the model's device.
+PolicyOutput runModel(PolicyNet& model, const ObsBatch& batch);
 
 // ---- Misc ---------------------------------------------------------------------
 

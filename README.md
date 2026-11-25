@@ -6,7 +6,7 @@ Online 2D bin packing of random polygons into 1x1 bins, with exact geometry and 
 * Polygons are written as SVG-like paths, such as `M 0 0 L 1/2 0 L 1/4 1/3 Z` (`M L H V Z`, plus lowercase forms for relative moves).
 * Rotations are exact. They're given by `t = tan(θ/2)` for any rational `t`, or as quarter turns.
 * `interiorsOverlap(a, b)` answers exactly, and touching edges or corners is allowed.
-* The network only *chooses* an action: a bin, a rotation and an entry column. Whether a move is legal and where the item comes to rest are decided by exact arithmetic. The item falls, then slides left, exactly as far as it can (`settleBottomLeft`).
+* **Free placement.** The network only *chooses* an action: a bin, a rotation and a spot on a 16×16 grid. The piece is put directly at that spot, so it can go anywhere that is free, including holes under overhangs. Whether the spot is free is decided exactly. By default the piece then slides down and left from there, exactly as far as it can (`settleBottomLeft`), so pieces end up touching instead of leaving grid-sized gaps (`--settle 0` turns this off).
 
 ## Layout
 
@@ -72,5 +72,21 @@ Each environment step runs exact geometry on the CPU, spread over `--threads`. T
 
 * **Episode:** 60 random star-shaped polygons arrive one at a time. Each must be placed immediately and permanently.
 * **Bins:** two bins stay open at a time (the bounded-space variant). Opening a third closes the oldest for good.
-* **Action:** `(slot, rotation, column)`, with 3 slots × 8 rotations × 16 columns. Slot 2 means "open a new bin". The 8 rotations are multiples of 90°, plus each of those plus about 45.24° (the exact 5-12-13 rotation).
+* **Action:** `(slot, rotation, gx, gy)`, with 3 slots × 8 rotations × 16 × 16 spots = 6,144 actions. Slot 2 means "open a new bin". The 8 rotations are multiples of 90°, plus each of those plus about 45.24° (the exact 5-12-13 rotation). The piece's bounding box starts at `(gx/16, gy/16)`. A spot is legal only if the piece fits there without overlapping anything; every spot is checked exactly each step, with exact shortcuts that skip far-away pieces.
+* **What the network sees:** for each (bin, rotation) pair, the bin as a 32×32 picture, a "contact" picture (how snugly the piece would sit at each spot), the exact legality mask, and a thumbnail of the piece. It outputs one score per spot.
 * **Reward:** −1 for every bin opened, so the return is −(bins used). The tools also report a lower bound on bins: ⌈total item area⌉.
+
+## Live viewer
+
+```sh
+cmake --build build --target polypack_visualize
+python3 viz/server.py        # open http://localhost:8000
+```
+
+Pick a player and a seed, then press Start:
+
+* **first fit:** oldest bin, no rotation, lowest and then left-most free spot.
+* **greedy (bottom-left fill):** in the oldest bin with room, tries every rotation at its lowest free spot and keeps the one whose top edge ends lowest.
+* **trained policy:** a checkpoint from `models/`.
+
+For each piece the viewer first shows, in green, every spot where it fits (checked exactly) and the chosen spot. For a trained policy it also shades each spot by the network's probability. The piece then appears at the chosen spot and slides along its exact path.
