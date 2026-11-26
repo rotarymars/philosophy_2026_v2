@@ -57,7 +57,9 @@ PPO
   --entropy-coef X (0.01)  --max-grad-norm X (0.5)
 
 Environment (new runs only)
-  --open-bins N (2)  --grid N (16)  --raster N (32)  --items N (60)
+  --open-bins N (2)  --grid N (16)  --raster N (32)
+  --min-items N (20)  --items N (100)  each episode has a random number of items
+                          in this range (--min-items 0: always --items)
   --settle 0|1 (1)        1: slide down/left from the chosen spot; 0: stay exactly there
   --min-vertices N (3)  --max-vertices N (8)
   --min-radius X (0.08)  --max-radius X (0.22)  --inner-ratio X (0.45)
@@ -79,20 +81,22 @@ EvalResult evaluate(PolicyNet* model, const EnvConfig& config, int episodes,
                     const std::vector<int>& offlineBins, const torch::Device& device, int threads) {
   std::vector<PackingEnv> envs(static_cast<std::size_t>(episodes), PackingEnv(config));
   parallelFor(episodes, threads, [&](int i) { envs[static_cast<std::size_t>(i)].reset(kEvalSeedBase + i); });
-  ObsBatch obs = ObsBatch::allocate(envs[0], episodes);
   std::vector<int64_t> actions(static_cast<std::size_t>(episodes), -1);
 
-  while (!envs[0].done()) {  // every episode has the same length
+  // Episodes differ in length: each step only plays the unfinished ones.
+  for (std::vector<int> active = unfinished(envs); !active.empty(); active = unfinished(envs)) {
+    const int n = static_cast<int>(active.size());
     if (model != nullptr) {
-      observeAll(envs, obs, threads);
+      const ObsBatch obs = observeSome(envs, active, threads);
       torch::NoGradGuard noGrad;
       const ObsBatch d = obs.to(device);
       const PolicyOutput out = runModel(*model, d);
       const torch::Tensor best = maskLogits(out.logits, d.mask).argmax(1).to(torch::kCPU);
       const auto acc = best.accessor<int64_t, 1>();
-      for (int i = 0; i < episodes; ++i) actions[static_cast<std::size_t>(i)] = acc[i];
+      for (int k = 0; k < n; ++k) actions[static_cast<std::size_t>(active[static_cast<std::size_t>(k)])] = acc[k];
     }
-    parallelFor(episodes, threads, [&](int i) {
+    parallelFor(n, threads, [&](int k) {
+      const int i = active[static_cast<std::size_t>(k)];
       PackingEnv& env = envs[static_cast<std::size_t>(i)];
       const int action = model != nullptr ? static_cast<int>(actions[static_cast<std::size_t>(i)])
                                           : firstFitAction(env);
@@ -162,6 +166,7 @@ int main(int argc, char** argv) {
     envConfig.settle = args.integer("settle", envConfig.settle ? 1 : 0) != 0;
     envConfig.rasterSize = static_cast<int>(args.integer("raster", envConfig.rasterSize));
     envConfig.itemsPerEpisode = static_cast<int>(args.integer("items", envConfig.itemsPerEpisode));
+    envConfig.minItemsPerEpisode = static_cast<int>(args.integer("min-items", envConfig.minItemsPerEpisode));
     GeneratorConfig& gen = envConfig.generator;
     gen.minVertices = static_cast<int>(args.integer("min-vertices", gen.minVertices));
     gen.maxVertices = static_cast<int>(args.integer("max-vertices", gen.maxVertices));

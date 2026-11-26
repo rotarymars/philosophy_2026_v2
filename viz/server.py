@@ -52,7 +52,9 @@ class Handler(BaseHTTPRequestHandler):
         player = get("player", "greedy")
         if player not in ("policy", "firstfit", "greedy"):
             return self.send_body(400, "text/plain", b"bad player")
-        cmd = [BINARY, "--player", player, "--seed", str(int(get("seed", "1")))]
+        cmd = [BINARY, "--player", player, "--seed", str(int(get("seed", "1"))),
+               "--min-items", str(int(get("minItems", "20"))),
+               "--items", str(int(get("maxItems", "100")))]
         if player == "policy":
             model = os.path.realpath(os.path.join(ROOT, get("model", "models/policy.pt")))
             if not model.startswith(os.path.join(ROOT, "models") + os.sep):
@@ -61,8 +63,7 @@ class Handler(BaseHTTPRequestHandler):
             if get("sample", "0") == "1":
                 cmd.append("--sample")
         else:
-            cmd += ["--items", str(int(get("items", "60"))),
-                    "--settle", "0" if get("settle", "1") == "0" else "1"]
+            cmd += ["--settle", "0" if get("settle", "1") == "0" else "1"]
 
         self.send_response(200)
         self.send_header("Content-Type", "text/event-stream")

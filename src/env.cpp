@@ -53,6 +53,7 @@ PackingEnv::PackingEnv(EnvConfig config)
   if (config_.grid < 1 || config_.grid > 256) throw std::invalid_argument("EnvConfig: grid must be in 1..256");
   if (config_.rasterSize < 8) throw std::invalid_argument("EnvConfig: rasterSize must be >= 8");
   if (config_.itemsPerEpisode < 1) throw std::invalid_argument("EnvConfig: itemsPerEpisode must be >= 1");
+  if (config_.minItemsPerEpisode < 0) throw std::invalid_argument("EnvConfig: minItemsPerEpisode must be >= 0");
   if (config_.maskThreads < 1) throw std::invalid_argument("EnvConfig: maskThreads must be >= 1");
   for (int g = 0; g < config_.grid; ++g) cellOffset_.emplace_back(Rational(g, config_.grid));
   const std::size_t pixels = static_cast<std::size_t>(config_.rasterSize) * config_.rasterSize;
@@ -63,6 +64,7 @@ PackingEnv::PackingEnv(EnvConfig config)
 void PackingEnv::reset(std::uint64_t seed) {
   rng_.seed(seed);
   fixedItems_.clear();
+  episodeLength_ = episodeLength(config_, seed);
   open_.clear();
   closed_.clear();
   areaSeen_ = 0;
@@ -73,11 +75,8 @@ void PackingEnv::reset(std::uint64_t seed) {
 }
 
 void PackingEnv::resetWithItems(std::vector<Polygon> items) {
-  if (static_cast<int>(items.size()) != config_.itemsPerEpisode) {
-    throw std::invalid_argument("PackingEnv::resetWithItems: expected " +
-                                std::to_string(config_.itemsPerEpisode) + " items, got " +
-                                std::to_string(items.size()));
-  }
+  if (items.empty()) throw std::invalid_argument("PackingEnv::resetWithItems: no items");
+  episodeLength_ = static_cast<int>(items.size());
   fixedItems_ = std::move(items);
   open_.clear();
   closed_.clear();
@@ -88,12 +87,23 @@ void PackingEnv::resetWithItems(std::vector<Polygon> items) {
   nextItem();
 }
 
+int episodeLength(const EnvConfig& config, std::uint64_t seed) {
+  const int lo = config.minItemsPerEpisode;
+  const int hi = config.itemsPerEpisode;
+  if (lo <= 0 || lo >= hi) return hi;
+  // A generator of its own, so the polygons themselves do not depend on the
+  // count range. Plain modulo keeps the result identical on every platform.
+  std::mt19937_64 rng(seed ^ 0x9e3779b97f4a7c15ULL);
+  return lo + static_cast<int>(rng() % static_cast<std::uint64_t>(hi - lo + 1));
+}
+
 std::vector<Polygon> episodeItems(const EnvConfig& config, std::uint64_t seed) {
   // Must match PackingEnv::reset + nextItem: one randomPolygon call per item.
   std::mt19937_64 rng(seed);
+  const int count = episodeLength(config, seed);
   std::vector<Polygon> items;
-  items.reserve(static_cast<std::size_t>(config.itemsPerEpisode));
-  for (int i = 0; i < config.itemsPerEpisode; ++i) items.push_back(randomPolygon(rng, config.generator));
+  items.reserve(static_cast<std::size_t>(count));
+  for (int i = 0; i < count; ++i) items.push_back(randomPolygon(rng, config.generator));
   return items;
 }
 
@@ -327,7 +337,7 @@ StepResult PackingEnv::step(int action) {
   rasterizeInto(placement, unitSquare(), config_.rasterSize, target.image);
 
   ++placed_;
-  if (placed_ >= config_.itemsPerEpisode) {
+  if (placed_ >= episodeLength_) {
     done_ = true;
     std::fill(mask_.begin(), mask_.end(), 0);
   } else {
@@ -397,6 +407,8 @@ void PackingEnv::observe(std::uint8_t* binImages, std::uint8_t* itemImages, std:
   }
 
   globalFeatures[0] = item_ ? static_cast<float>(toDouble(item_->area()) * 10.0) : 0.0f;
+  // Divided by the largest possible count, not this episode's: the player must
+  // not learn how many items are left.
   globalFeatures[1] = static_cast<float>(placed_) / static_cast<float>(config_.itemsPerEpisode);
   globalFeatures[2] = static_cast<float>(open_.size()) / static_cast<float>(config_.openBins);
   std::memcpy(mask, mask_.data(), mask_.size());

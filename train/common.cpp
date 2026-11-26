@@ -36,6 +36,10 @@ int64_t getInt(torch::serialize::InputArchive& a, const std::string& key) {
   a.read("meta." + key, t);
   return t.item<int64_t>();
 }
+int64_t tryGetInt(torch::serialize::InputArchive& a, const std::string& key, int64_t fallback) {
+  torch::Tensor t;
+  return a.try_read("meta." + key, t) ? t.item<int64_t>() : fallback;
+}
 double getReal(torch::serialize::InputArchive& a, const std::string& key) {
   torch::Tensor t;
   a.read("meta." + key, t);
@@ -53,6 +57,7 @@ void saveCheckpoint(const std::string& path, PolicyNet& model, torch::optim::Opt
   putInt(archive, "env.settle", meta.env.settle ? 1 : 0);
   putInt(archive, "env.rasterSize", meta.env.rasterSize);
   putInt(archive, "env.itemsPerEpisode", meta.env.itemsPerEpisode);
+  putInt(archive, "env.minItemsPerEpisode", meta.env.minItemsPerEpisode);
   putInt(archive, "gen.minVertices", meta.env.generator.minVertices);
   putInt(archive, "gen.maxVertices", meta.env.generator.maxVertices);
   putReal(archive, "gen.minRadius", meta.env.generator.minRadius);
@@ -101,6 +106,8 @@ CheckpointMeta loadCheckpointMeta(const std::string& path) {
   m.env.settle = getInt(archive, "env.settle") != 0;
   m.env.rasterSize = static_cast<int>(getInt(archive, "env.rasterSize"));
   m.env.itemsPerEpisode = static_cast<int>(getInt(archive, "env.itemsPerEpisode"));
+  // Older checkpoints always had exactly itemsPerEpisode items.
+  m.env.minItemsPerEpisode = static_cast<int>(tryGetInt(archive, "env.minItemsPerEpisode", 0));
   m.env.generator.minVertices = static_cast<int>(getInt(archive, "gen.minVertices"));
   m.env.generator.maxVertices = static_cast<int>(getInt(archive, "gen.maxVertices"));
   m.env.generator.minRadius = getReal(archive, "gen.minRadius");
@@ -188,6 +195,22 @@ void observeInto(const PackingEnv& env, ObsBatch& out, int64_t i) {
 void observeAll(const std::vector<PackingEnv>& envs, ObsBatch& out, int threads) {
   parallelFor(static_cast<int>(envs.size()), threads,
               [&](int i) { observeInto(envs[static_cast<std::size_t>(i)], out, i); });
+}
+
+std::vector<int> unfinished(const std::vector<PackingEnv>& envs) {
+  std::vector<int> result;
+  for (std::size_t i = 0; i < envs.size(); ++i) {
+    if (!envs[i].done()) result.push_back(static_cast<int>(i));
+  }
+  return result;
+}
+
+ObsBatch observeSome(const std::vector<PackingEnv>& envs, const std::vector<int>& indices, int threads) {
+  ObsBatch out = ObsBatch::allocate(envs.at(0), static_cast<int64_t>(indices.size()));
+  parallelFor(static_cast<int>(indices.size()), threads, [&](int k) {
+    observeInto(envs[static_cast<std::size_t>(indices[static_cast<std::size_t>(k)])], out, k);
+  });
+  return out;
 }
 
 PolicyOutput runModel(PolicyNet& model, const ObsBatch& b) {

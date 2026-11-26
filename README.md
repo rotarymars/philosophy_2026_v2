@@ -73,6 +73,8 @@ A CUDA libtorch also needs the NVIDIA driver and a CUDA toolkit (`nvcc`). The se
 
 ### Score
 
+Each episode has a random number of pieces, from 20 to 100 (`--min-items`, `--items`), with random shapes. The seed picks both the count and the shapes. The player never learns how many pieces are still to come. Every model is evaluated on the same piece range, whatever it was trained with.
+
 For each episode, an offline reference packs the same items while seeing all of them in advance and keeping every bin open. It tries many packing patterns and keeps the fewest bins:
 * item orders: largest area first, largest diameter first, largest bounding box first, arrival order, and seeded "noisy area" orders,
 * bin choice: first fit or best fit, each piece placed bottom-left.
@@ -81,7 +83,7 @@ For each episode, an offline reference packs the same items while seeing all of 
 
 ## The learning problem
 
-* **Episode:** 60 random star-shaped polygons arrive one at a time. Each must be placed immediately and permanently.
+* **Episode:** a random number (20–100) of random star-shaped polygons arrive one at a time. Each must be placed immediately and permanently.
 * **Bins:** two bins stay open at a time (the bounded-space variant). Opening a third closes the oldest for good.
 * **Action:** `(slot, rotation, gx, gy)`, with 3 slots × 8 rotations × 16 × 16 spots = 6,144 actions. Slot 2 means "open a new bin". The 8 rotations are multiples of 90°, plus each of those plus about 45.24° (the exact 5-12-13 rotation). The piece's bounding box starts at `(gx/16, gy/16)`. A spot is legal only if the piece fits there without overlapping anything; every spot is checked exactly each step, with exact shortcuts that skip far-away pieces.
 * **What the network sees:** for each (bin, rotation) pair, the bin as a 32×32 picture, a "contact" picture (how snugly the piece would sit at each spot), the exact legality mask, and a thumbnail of the piece. It outputs one score per spot.

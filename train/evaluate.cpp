@@ -42,6 +42,10 @@ Lower is better; 1.0 = as good as the offline reference.
   --greedy-baseline      also run the bottom-left-fill greedy baseline
   --offline-patterns N   packing patterns the offline reference tries per
                          episode (default 16)
+  --min-items N          fewest items per episode (default 20)
+  --items N              most items per episode (default 100); each episode
+                         gets a random count in between, chosen by its seed.
+                         The same for every model, whatever it was trained on
   --sample               sample from the policy instead of taking the argmax
   --svg-dir DIR          write SVGs of the policy's bins for the first episodes
   --svg-episodes N       how many episodes to draw (default 1)
@@ -54,12 +58,13 @@ std::vector<PackingEnv> play(Player player, PolicyNet* model, const EnvConfig& c
                              const torch::Device& device, int threads) {
   std::vector<PackingEnv> envs(static_cast<std::size_t>(episodes), PackingEnv(config));
   parallelFor(episodes, threads, [&](int i) { envs[static_cast<std::size_t>(i)].reset(seedBase + i); });
-  ObsBatch obs = ObsBatch::allocate(envs[0], episodes);
   std::vector<int64_t> actions(static_cast<std::size_t>(episodes), -1);
 
-  while (!envs[0].done()) {
+  // Episodes differ in length: each step only plays the unfinished ones.
+  for (std::vector<int> active = unfinished(envs); !active.empty(); active = unfinished(envs)) {
+    const int n = static_cast<int>(active.size());
     if (player == Player::Policy) {
-      observeAll(envs, obs, threads);
+      const ObsBatch obs = observeSome(envs, active, threads);
       torch::NoGradGuard noGrad;
       const ObsBatch d = obs.to(device);
       const torch::Tensor logits =
@@ -68,9 +73,10 @@ std::vector<PackingEnv> play(Player player, PolicyNet* model, const EnvConfig& c
           (sample ? torch::multinomial(torch::softmax(logits, 1), 1).squeeze(1) : logits.argmax(1))
               .to(torch::kCPU);
       const auto acc = chosen.accessor<int64_t, 1>();
-      for (int i = 0; i < episodes; ++i) actions[static_cast<std::size_t>(i)] = acc[i];
+      for (int k = 0; k < n; ++k) actions[static_cast<std::size_t>(active[static_cast<std::size_t>(k)])] = acc[k];
     }
-    parallelFor(episodes, threads, [&](int i) {
+    parallelFor(n, threads, [&](int k) {
+      const int i = active[static_cast<std::size_t>(k)];
       PackingEnv& env = envs[static_cast<std::size_t>(i)];
       int action = 0;
       switch (player) {
@@ -131,14 +137,23 @@ int main(int argc, char** argv) {
     const bool sample = args.has("sample");
     args.str("sample", "");
     const int offlinePatterns = static_cast<int>(args.integer("offline-patterns", kDefaultOfflinePatterns));
+    EnvConfig defaults;
+    const int maxItems = static_cast<int>(args.integer("items", defaults.itemsPerEpisode));
+    const int minItems = static_cast<int>(args.integer("min-items", defaults.minItemsPerEpisode));
     const std::string svgDir = args.str("svg-dir", "");
     const int svgEpisodes = static_cast<int>(args.integer("svg-episodes", 1));
     args.rejectUnknown();
 
-    const CheckpointMeta meta = loadCheckpointMeta(modelPath);
+    CheckpointMeta meta = loadCheckpointMeta(modelPath);
+    // The network does not depend on the item count, so every model is
+    // judged on the same episodes.
+    meta.env.itemsPerEpisode = maxItems;
+    meta.env.minItemsPerEpisode = minItems;
     PolicyNet model(meta.model);
     model->to(device);
     loadCheckpointWeights(modelPath, model, nullptr, device);
+    std::cout << "Episodes: " << episodes << ", each with a random number of pieces from " << minItems
+              << " to " << maxItems << " (chosen by its seed)\n";
     std::cout << "Model " << modelPath << " (iteration " << meta.iteration << ", " << meta.envSteps
               << " env steps)\n";
 
@@ -155,13 +170,14 @@ int main(int argc, char** argv) {
         packOfflineEpisodes(meta.env, seedBase, episodes, offlinePatterns, threads);
 
     std::cout << "\nbins used per episode\n"
-              << "episode  policy  first-fit" << (greedy ? "  greedy" : "")
+              << "episode  pieces  policy  first-fit" << (greedy ? "  greedy" : "")
               << "  offline  area-lower-bound  offline pattern\n";
     bool allValid = true;
     int proven = 0;
     for (int i = 0; i < episodes; ++i) {
       const auto k = static_cast<std::size_t>(i);
-      std::cout << std::setw(7) << i << std::setw(8) << policy[k].binsUsed() << std::setw(11)
+      std::cout << std::setw(7) << i << std::setw(8) << policy[k].episodeItemCount() << std::setw(8)
+                << policy[k].binsUsed() << std::setw(11)
                 << firstFit[k].binsUsed();
       if (greedy) std::cout << std::setw(8) << greedyRun[k].binsUsed();
       std::cout << std::setw(9) << offline[k].bins << std::setw(18) << offline[k].lowerBound << "  "
@@ -176,7 +192,11 @@ int main(int argc, char** argv) {
     }
     bound /= episodes;
     offlineMean /= episodes;
-    std::cout << std::fixed << std::setprecision(3) << "   mean" << std::setw(8) << meanBins(policy)
+    double meanPieces = 0;
+    for (const PackingEnv& e : policy) meanPieces += e.episodeItemCount();
+    meanPieces /= episodes;
+    std::cout << std::fixed << std::setprecision(3) << "   mean" << std::setw(8) << std::setprecision(1)
+              << meanPieces << std::setprecision(3) << std::setw(8) << meanBins(policy)
               << std::setw(11) << meanBins(firstFit);
     if (greedy) std::cout << std::setw(8) << meanBins(greedyRun);
     std::cout << std::setw(9) << offlineMean << std::setw(18) << bound << '\n';

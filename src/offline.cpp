@@ -130,6 +130,7 @@ std::vector<Bin> runPattern(const std::vector<Polygon>& items, const EnvConfig& 
   EnvConfig offline = config;
   offline.openBins = static_cast<int>(items.size());  // never close a bin
   offline.itemsPerEpisode = static_cast<int>(items.size());
+  offline.minItemsPerEpisode = 0;
   offline.settle = true;
   offline.maskThreads = 1;
   std::vector<Polygon> sequence;

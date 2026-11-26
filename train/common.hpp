@@ -64,6 +64,10 @@ void observeInto(const PackingEnv& env, ObsBatch& out, int64_t i);
 
 // Fills `out` (allocated for envs.size()) from the environments, in parallel.
 void observeAll(const std::vector<PackingEnv>& envs, ObsBatch& out, int threads);
+// Indices of the episodes that are not finished yet (episodes differ in length).
+std::vector<int> unfinished(const std::vector<PackingEnv>& envs);
+// Observations of envs[indices[k]] in row k.
+ObsBatch observeSome(const std::vector<PackingEnv>& envs, const std::vector<int>& indices, int threads);
 
 // Runs the model on a batch that already lives on the model's device.
 PolicyOutput runModel(PolicyNet& model, const ObsBatch& batch);

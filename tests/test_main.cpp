@@ -6,6 +6,7 @@
 #include <functional>
 #include <iostream>
 #include <random>
+#include <set>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -343,6 +344,7 @@ void checkMaskAgainstBruteForce(const PackingEnv& env) {
 void testEnv() {
   EnvConfig config;
   config.itemsPerEpisode = 25;
+  config.minItemsPerEpisode = 0;  // fixed length
   PackingEnv env(config);
   CHECK(env.actionCount() == 3 * 8 * 16 * 16);
   for (int a : {0, 77, 4095, 6143}) CHECK(env.encodeAction(env.decodeAction(a)) == a);
@@ -448,6 +450,7 @@ void testBin() {
 void testOffline() {
   EnvConfig config;
   config.itemsPerEpisode = 30;
+  config.minItemsPerEpisode = 0;  // fixed length
 
   // episodeItems reproduces the online item sequence exactly.
   PackingEnv env(config);
@@ -466,7 +469,52 @@ void testOffline() {
   PackingEnv fixed(config);
   fixed.resetWithItems(items);
   CHECK(fixed.currentItem() == items[0]);
-  CHECK_THROWS(fixed.resetWithItems(std::vector<Polygon>(items.begin(), items.begin() + 3)));
+  CHECK_THROWS(fixed.resetWithItems({}));
+  // Any number of items works; the episode ends after the last one.
+  fixed.resetWithItems(std::vector<Polygon>(items.begin(), items.begin() + 3));
+  int shortSteps = 0;
+  while (!fixed.done()) {
+    fixed.step(greedyBottomLeftAction(fixed));
+    ++shortSteps;
+  }
+  CHECK(shortSteps == 3);
+
+  // Random episode lengths: the seed picks a count in [min, max], the env
+  // ends after exactly that many items, and the items are a prefix of the
+  // fixed-length sequence of the same seed.
+  {
+    EnvConfig random = config;
+    random.minItemsPerEpisode = 4;
+    random.itemsPerEpisode = 12;
+    std::set<int> seen;
+    for (std::uint64_t seed = 0; seed < 200; ++seed) {
+      const int n = episodeLength(random, seed);
+      CHECK(n >= 4 && n <= 12);
+      CHECK(n == episodeLength(random, seed));
+      seen.insert(n);
+      const std::vector<Polygon> its = episodeItems(random, seed);
+      CHECK(static_cast<int>(its.size()) == n);
+      if (seed < 6) {
+        const std::vector<Polygon> full = episodeItems(config, seed);  // 30 items
+        for (int i = 0; i < n; ++i) CHECK(its[static_cast<std::size_t>(i)] == full[static_cast<std::size_t>(i)]);
+        PackingEnv e(random);
+        e.reset(seed);
+        CHECK(e.episodeItemCount() == n);
+        int steps = 0;
+        while (!e.done()) {
+          CHECK(e.currentItem() == its[static_cast<std::size_t>(steps)]);
+          e.step(greedyBottomLeftAction(e));
+          ++steps;
+        }
+        CHECK(steps == n);
+        CHECK(packingIsValid(e));
+      }
+    }
+    CHECK(seen.size() == 9);  // every count from 4 to 12 occurs
+    EnvConfig fixedRange = random;
+    fixedRange.minItemsPerEpisode = 12;
+    CHECK(episodeLength(fixedRange, 3) == 12);
+  }
 
   for (std::uint64_t seed : {5ULL, 11ULL, 1000000007ULL}) {
     const OfflineResult r = packOfflineEpisode(config, seed);

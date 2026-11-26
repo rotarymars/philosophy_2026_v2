@@ -2,8 +2,10 @@
 
 // The online 2D bin-packing environment used for training.
 //
-// Episode: `itemsPerEpisode` random polygons arrive one at a time. Each must
-// be placed immediately and permanently.
+// Episode: a random number of random polygons (between minItemsPerEpisode
+// and itemsPerEpisode, both chosen by the seed) arrive one at a time. Each
+// must be placed immediately and permanently. The player is never told how
+// many items are still to come.
 //
 // Bins: at most `openBins` bins stay open (the bounded-space variant of
 // online bin packing). Opening a new bin while that many are open closes the
@@ -49,7 +51,8 @@ struct EnvConfig {
   int grid = 16;          // placement grid: grid x grid spots per bin and rotation
   bool settle = true;     // slide down/left from the chosen spot after placing
   int rasterSize = 32;
-  int itemsPerEpisode = 60;
+  int itemsPerEpisode = 100;    // most items an episode can have
+  int minItemsPerEpisode = 20;  // fewest; 0 or >= itemsPerEpisode means always itemsPerEpisode
   int maskThreads = 1;    // threads for the legality mask (keep 1 when envs already run in parallel)
   GeneratorConfig generator;
 };
@@ -77,11 +80,11 @@ class PackingEnv {
 
   explicit PackingEnv(EnvConfig config);
 
-  // Starts a new episode; the item sequence is fully determined by `seed`
-  // (it is exactly episodeItems(config, seed)).
+  // Starts a new episode; the item count and sequence are fully determined
+  // by `seed` (it is exactly episodeItems(config, seed)).
   void reset(std::uint64_t seed);
   // Starts a new episode whose items arrive in exactly this order (used by
-  // the offline packer). Requires items.size() == itemsPerEpisode.
+  // the offline packer). Requires at least one item.
   void resetWithItems(std::vector<Polygon> items);
 
   const EnvConfig& config() const noexcept { return config_; }
@@ -129,6 +132,9 @@ class PackingEnv {
 
   bool done() const noexcept { return done_; }
   int itemsPlaced() const noexcept { return placed_; }
+  // Items in the current episode. Known to the environment only: it is not
+  // part of the observation.
+  int episodeItemCount() const noexcept { return episodeLength_; }
   int binsUsed() const noexcept { return binsUsed_; }
   const Polygon& currentItem() const;
   // Exact total area of all items seen so far, and ceil() of it: no packing
@@ -172,11 +178,15 @@ class PackingEnv {
   std::vector<std::uint8_t> mask_;
   Rational areaSeen_;
   int placed_ = 0;
+  int episodeLength_ = 0;
   int binsUsed_ = 0;
   bool done_ = true;
 };
 
-// The items an episode with this seed delivers, in arrival order.
+// How many items an episode with this seed has.
+int episodeLength(const EnvConfig& config, std::uint64_t seed);
+// The items an episode with this seed delivers, in arrival order. A seed's
+// items are always a prefix of the same sequence, whatever the count range.
 std::vector<Polygon> episodeItems(const EnvConfig& config, std::uint64_t seed);
 
 // Baselines (no learning), useful as references.

@@ -36,7 +36,9 @@ const char* kUsage = R"(polypack_visualize: stream one episode as JSON lines
   --offline-patterns N  packing patterns for the offline reference that the
                     score divides by (default 16; 0 = skip it)
   Baselines only (a policy uses the settings it was trained with):
-  --items N         items per episode (default 60)
+  --min-items N     fewest items per episode (default 20)
+  --items N         most items per episode (default 100); the seed picks
+                    the count in between
   --open-bins N     open bins (default 2)
   --grid N          placement grid size (default 16)
   --settle 0|1      slide down/left after placing (default 1)
@@ -91,6 +93,9 @@ int main(int argc, char** argv) {
     const int offlinePatterns = static_cast<int>(args.integer("offline-patterns", kDefaultOfflinePatterns));
     EnvConfig config;
     config.itemsPerEpisode = static_cast<int>(args.integer("items", config.itemsPerEpisode));
+    config.minItemsPerEpisode = static_cast<int>(args.integer("min-items", config.minItemsPerEpisode));
+    const int maxItems = config.itemsPerEpisode;
+    const int minItems = config.minItemsPerEpisode;
     config.openBins = static_cast<int>(args.integer("open-bins", config.openBins));
     config.grid = static_cast<int>(args.integer("grid", config.grid));
     config.settle = args.integer("settle", 1) != 0;
@@ -103,6 +108,8 @@ int main(int argc, char** argv) {
     if (player == "policy") {
       const CheckpointMeta meta = loadCheckpointMeta(modelPath);
       config = meta.env;
+      config.itemsPerEpisode = maxItems;  // the network does not depend on the item count
+      config.minItemsPerEpisode = minItems;
       model.emplace(meta.model);
       (*model)->to(device);
       loadCheckpointWeights(modelPath, *model, nullptr, device);
@@ -128,7 +135,7 @@ int main(int argc, char** argv) {
     std::cout << "{\"type\":\"start\",\"player\":\"" << player << "\",\"seed\":" << seed
               << ",\"openBins\":" << config.openBins << ",\"grid\":" << G
               << ",\"settle\":" << (config.settle ? "true" : "false")
-              << ",\"rotations\":" << env.rotations() << ",\"items\":" << config.itemsPerEpisode << "}\n"
+              << ",\"rotations\":" << env.rotations() << ",\"items\":" << env.episodeItemCount() << "}\n"
               << std::flush;
 
     ObsBatch obs = ObsBatch::allocate(env, 1);
