@@ -11,8 +11,10 @@
 #include "common.hpp"
 
 #include "polypack/env.hpp"
+#include "polypack/offline.hpp"
 #include "polypack/slide.hpp"
 
+#include <future>
 #include <iostream>
 #include <optional>
 #include <sstream>
@@ -31,6 +33,8 @@ const char* kUsage = R"(polypack_visualize: stream one episode as JSON lines
   --seed N          episode seed (default 1)
   --sample          sample from the policy instead of taking the argmax
   --device NAME     auto | cpu | cuda (default cpu)
+  --offline-patterns N  packing patterns for the offline reference that the
+                    score divides by (default 16; 0 = skip it)
   Baselines only (a policy uses the settings it was trained with):
   --items N         items per episode (default 60)
   --open-bins N     open bins (default 2)
@@ -84,6 +88,7 @@ int main(int argc, char** argv) {
     const bool sample = args.has("sample");
     args.str("sample", "");
     const torch::Device device = pickDevice(args.str("device", "cpu"));
+    const int offlinePatterns = static_cast<int>(args.integer("offline-patterns", kDefaultOfflinePatterns));
     EnvConfig config;
     config.itemsPerEpisode = static_cast<int>(args.integer("items", config.itemsPerEpisode));
     config.openBins = static_cast<int>(args.integer("open-bins", config.openBins));
@@ -105,6 +110,16 @@ int main(int argc, char** argv) {
     }
     // A single episode: use every core for the legality mask.
     config.maskThreads = static_cast<int>(std::max(1u, std::thread::hardware_concurrency()));
+
+    // The offline reference (same items, all seen in advance, many packing
+    // patterns) is computed alongside the episode; the score divides by it.
+    std::future<OfflineResult> offline;
+    if (offlinePatterns > 0) {
+      offline = std::async(std::launch::async, [config, seed, offlinePatterns] {
+        return packOfflineEpisodes({episodeItems(config, seed)}, config, offlinePatterns,
+                                   config.maskThreads).front();
+      });
+    }
 
     PackingEnv env(config);
     env.reset(seed);
@@ -190,8 +205,30 @@ int main(int argc, char** argv) {
         << ",\"fill\":" << toDouble(after[static_cast<std::size_t>(targetBin)].fillRatio()) << "}\n";
       std::cout << o.str() << std::flush;
     }
+    double score = -1;
+    if (offline.valid()) {
+      const OfflineResult r = offline.get();
+      score = static_cast<double>(env.binsUsed()) / r.bins;
+      std::ostringstream o;
+      o.precision(9);
+      o << "{\"type\":\"offline\",\"bins\":" << r.bins << ",\"lowerBound\":" << r.lowerBound
+        << ",\"pattern\":\"" << r.pattern << "\",\"patternsTried\":" << r.patternsTried
+        << ",\"proven\":" << (r.bins == r.lowerBound ? "true" : "false") << ",\"packing\":[";
+      for (std::size_t b = 0; b < r.packing.size(); ++b) {
+        o << (b ? "," : "") << '[';
+        const std::vector<Polygon>& items = r.packing[b].items();
+        for (std::size_t i = 0; i < items.size(); ++i) {
+          if (i) o << ',';
+          writePoly(o, items[i]);
+        }
+        o << ']';
+      }
+      o << "]}\n";
+      std::cout << o.str() << std::flush;
+    }
     std::cout << "{\"type\":\"done\",\"binsUsed\":" << env.binsUsed()
-              << ",\"lowerBound\":" << env.areaLowerBound() << "}\n" << std::flush;
+              << ",\"lowerBound\":" << env.areaLowerBound() << ",\"score\":" << score << "}\n"
+              << std::flush;
     return 0;
   } catch (const std::exception& e) {
     std::cout << "{\"type\":\"error\",\"message\":\"" << e.what() << "\"}\n" << std::flush;

@@ -89,7 +89,7 @@ void saveCheckpoint(const std::string& path, PolicyNet& model, torch::optim::Opt
 
 CheckpointMeta loadCheckpointMeta(const std::string& path) {
   torch::serialize::InputArchive archive;
-  archive.load_from(path);
+  archive.load_from(path, torch::Device(torch::kCPU));  // the file may hold CUDA tensors
   const int64_t format = getInt(archive, "format");
   if (format != kFormatVersion && format != 2) {
     throw std::runtime_error("unsupported checkpoint format in " + path +

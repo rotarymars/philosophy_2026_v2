@@ -28,6 +28,10 @@
   .bin.open { border-color:var(--accent); }
   .bin .cap { display:flex; justify-content:space-between; font-size:12px; color:var(--mute); margin-bottom:4px; }
   canvas { display:block; }
+  #offline { padding:0 16px 24px; }
+  #offline h2 { font-size:14px; margin:0 0 4px; }
+  #offline p { margin:0 0 8px; color:var(--mute); font-size:12px; }
+  #offlineBins { display:flex; flex-wrap:wrap; gap:14px; }
 </style>
 </head>
 <body>
@@ -41,6 +45,7 @@
   <label id="modelWrap" hidden>Model <select id="model"></select></label>
   <label id="settleWrap"><input id="settle" type="checkbox" checked> slide down/left after placing</label>
   <label>Seed <input id="seed" type="number" value="1"></label>
+  <button id="random" title="pick a random seed (a new random set of pieces) and start">Random pieces</button>
   <label>Speed <input id="speed" type="range" min="0.25" max="8" step="0.25" value="1"><span id="speedOut">1×</span></label>
   <label><input id="showLegal" type="checkbox" checked> show free spots</label>
   <button id="start" class="primary">Start</button>
@@ -51,6 +56,8 @@
   <span>Bins used <b id="sBins">–</b></span>
   <span>Area lower bound <b id="sLB">–</b></span>
   <span>Legal moves <b id="sLegal">–</b></span>
+  <span title="fewest bins found when all pieces are known in advance (many packing patterns tried)">Offline reference <b id="sOff">–</b></span>
+  <span title="bins used ÷ offline reference bins; lower is better, 1.00 = as good as offline">Score <b id="sScore">–</b></span>
   <span id="status"></span>
 </div>
 <div id="action"></div>
@@ -60,6 +67,11 @@
   <span><span class="sw" style="border:2px solid var(--ink)"></span>chosen spot (lower-left corner of the piece's box)</span>
 </div>
 <div id="bins"></div>
+<div id="offline" hidden>
+  <h2>Offline reference: the same pieces, all known in advance</h2>
+  <p id="offlineInfo"></p>
+  <div id="offlineBins"></div>
+</div>
 
 <script>
 const $ = id => document.getElementById(id);
@@ -71,18 +83,18 @@ let es = null, queue = [], bins = [], current = null, paused = false, meta = nul
 function hue(i) { return (i * 137.508) % 360; }
 function css(name) { return getComputedStyle(document.body).getPropertyValue(name).trim(); }
 
-function makeBin(index) {
+function makeBin(index, parent = $("bins"), scale = 1) {
   const div = document.createElement("div");
   div.className = "bin";
   div.innerHTML = `<div class="cap"><span>Bin ${index + 1}</span><span class="fill"></span></div>`;
   const c = document.createElement("canvas");
-  const dpr = window.devicePixelRatio || 1;
+  const dpr = (window.devicePixelRatio || 1) * scale;
   const px = SIZE + 2 * PAD;
   c.width = px * dpr; c.height = px * dpr;
-  c.style.width = px + "px"; c.style.height = px + "px";
+  c.style.width = px * scale + "px"; c.style.height = px * scale + "px";
   c.getContext("2d").scale(dpr, dpr);
   div.appendChild(c);
-  $("bins").appendChild(div);
+  parent.appendChild(div);
   return { div, canvas: c, items: [], fill: 0, closed: false };
 }
 
@@ -187,7 +199,13 @@ function tick(now) {
     if (!current && queue.length) {
       const msg = queue.shift();
       if (msg.type === "step") startStep(msg);
-      else if (msg.type === "done") { bins.forEach(b => b.closed = false); $("status").textContent = `Done: ${msg.binsUsed} bins (lower bound ${msg.lowerBound})`; }
+      else if (msg.type === "offline") showOffline(msg);
+      else if (msg.type === "done") {
+        bins.forEach(b => b.closed = false);
+        let txt = `Done: ${msg.binsUsed} bins (area lower bound ${msg.lowerBound})`;
+        if (msg.score >= 0) { $("sScore").textContent = msg.score.toFixed(2); txt += ` · score ${msg.score.toFixed(2)}`; }
+        $("status").textContent = txt;
+      }
     }
     if (current) {
       if (current.phase === "show" || current.phase === "place") {
@@ -211,12 +229,32 @@ function tick(now) {
 }
 requestAnimationFrame(tick);
 
+function showOffline(msg) {
+  $("sOff").textContent = `${msg.bins} bins`;
+  $("offline").hidden = false;
+  $("offlineInfo").textContent =
+    `Fewest bins found: ${msg.bins} (best of ${msg.patternsTried} packing pattern${msg.patternsTried > 1 ? "s" : ""}; ` +
+    `best: ${msg.pattern}). ` +
+    (msg.proven ? "This equals the area lower bound, so it is optimal." : `The area lower bound is ${msg.lowerBound}, so this may not be optimal.`);
+  $("offlineBins").innerHTML = "";
+  let n = 0;
+  msg.packing.forEach((items, i) => {
+    const b = makeBin(i, $("offlineBins"), 0.6);
+    b.items = items.map(pts => ({ pts, n: n++ }));
+    b.fill = 0;
+    drawBin(b, -1);
+    b.div.classList.remove("open");
+    b.div.querySelector(".fill").textContent = `${items.length} pieces`;
+  });
+}
+
 function start() {
   if (es) es.close();
   queue = []; current = null; bins = []; $("bins").innerHTML = ""; paused = false;
+  $("offline").hidden = true; $("offlineBins").innerHTML = "";
   $("pause").textContent = "Pause";
   $("status").textContent = "running…"; $("action").textContent = "";
-  ["sItem", "sBins", "sLB", "sLegal"].forEach(id => $(id).textContent = "–");
+  ["sItem", "sBins", "sLB", "sLegal", "sOff", "sScore"].forEach(id => $(id).textContent = "–");
   const p = new URLSearchParams({
     player: $("player").value, seed: $("seed").value, model: $("model").value || "",
     settle: $("settle").checked ? "1" : "0",
@@ -232,6 +270,7 @@ function start() {
 }
 
 $("start").onclick = start;
+$("random").onclick = () => { $("seed").value = Math.floor(Math.random() * 1e9); start(); };
 $("pause").onclick = () => { paused = !paused; $("pause").textContent = paused ? "Resume" : "Pause"; };
 $("speed").oninput = () => $("speedOut").textContent = $("speed").value + "×";
 $("player").onchange = () => {
