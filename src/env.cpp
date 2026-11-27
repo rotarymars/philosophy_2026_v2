@@ -58,7 +58,7 @@ PackingEnv::PackingEnv(EnvConfig config)
   for (int g = 0; g < config_.grid; ++g) cellOffset_.emplace_back(Rational(g, config_.grid));
   const std::size_t pixels = static_cast<std::size_t>(config_.rasterSize) * config_.rasterSize;
   itemImages_.assign(rotations_.size() * pixels, 0);
-  mask_.assign(static_cast<std::size_t>(actionCount()), 0);
+  if (!config_.lazyMask) mask_.assign(static_cast<std::size_t>(actionCount()), 0);
 }
 
 void PackingEnv::reset(std::uint64_t seed) { startEpisode(episodeItems(config_, seed)); }
@@ -157,7 +157,7 @@ void PackingEnv::nextItem() {
     variantDiag_.push_back(diagonalsOf(v));
     variants_.push_back(std::move(v));
   }
-  computeMask();
+  if (!config_.lazyMask) computeMask();
 }
 
 // Exact legality of every grid spot for one (open bin, rotation) pair.
@@ -168,22 +168,25 @@ void PackingEnv::nextItem() {
 // integer ranges of gx, gy, gx+gy and gx-gy (computed with exact rational
 // floor/ceil), so most (spot, item) pairs are ruled out by integer compares.
 // Every remaining pair gets the full exact interiorsOverlap test.
-void PackingEnv::computeMaskFor(int slot, int rotation) {
+int PackingEnv::scanSpots(int slot, int rotation, std::uint8_t* out) const {
   const Polygon& v = variants_[static_cast<std::size_t>(rotation)];
   const Diagonals& vd = variantDiag_[static_cast<std::size_t>(rotation)];
   const Rational& w = v.bounds().max.x;  // the variant's bounding box starts at (0, 0)
   const Rational& h = v.bounds().max.y;
   const int gxMax = lastFittingCell(w);
   const int gyMax = lastFittingCell(h);
-  if (gxMax < 0 || gyMax < 0) return;
+  if (gxMax < 0 || gyMax < 0) return -1;
 
   const OpenBin& ob = open_[static_cast<std::size_t>(slot)];
+  // Exact shortcut: if the item's area exceeds the bin's free area, no spot
+  // can be legal (every spot stays 0, as the full check would find).
+  if (ob.bin.usedArea() + item_->area() > Rational(1)) return -1;
   const std::vector<Polygon>& items = ob.bin.items();
   const Rational g(config_.grid);
 
   struct Near {
     long xLo, xHi, yLo, yHi, sLo, sHi, dLo, dHi;
-    const Polygon* item;
+    std::size_t index;
   };
   std::vector<Near> near;
   for (std::size_t i = 0; i < items.size(); ++i) {
@@ -197,12 +200,13 @@ void PackingEnv::computeMaskFor(int slot, int rotation) {
     if (n.xLo > std::min<long>(n.xHi, gxMax) || n.xHi < 0) continue;
     if (n.yLo > std::min<long>(n.yHi, gyMax) || n.yHi < 0) continue;
     if (n.sLo > n.sHi || n.dLo > n.dHi) continue;
-    n.item = &items[i];
+    n.index = i;
     near.push_back(n);
   }
 
   std::vector<const Near*> row;
-  std::vector<const Polygon*> hits;
+  std::vector<std::size_t> hits;
+  int first = -1;
   for (int gy = 0; gy <= gyMax; ++gy) {
     row.clear();
     for (const Near& n : near) {
@@ -213,23 +217,59 @@ void PackingEnv::computeMaskFor(int slot, int rotation) {
       for (const Near* n : row) {
         if (gx >= n->xLo && gx <= n->xHi && gx + gy >= n->sLo && gx + gy <= n->sHi &&
             gx - gy >= n->dLo && gx - gy <= n->dHi) {
-          hits.push_back(n->item);
+          hits.push_back(n->index);
         }
       }
       bool legal = true;
       if (!hits.empty()) {
-        const Polygon placed = v.translated(Point(cellOffset_[static_cast<std::size_t>(gx)],
-                                                  cellOffset_[static_cast<std::size_t>(gy)]));
-        for (const Polygon* other : hits) {
-          if (interiorsOverlap(*other, placed)) {
+        const Point offset(cellOffset_[static_cast<std::size_t>(gx)], cellOffset_[static_cast<std::size_t>(gy)]);
+        const Polygon placed = v.translated(offset);
+        for (std::size_t k : hits) {
+          if (interiorsOverlap(items[k], placed)) {
             legal = false;
             break;
           }
         }
       }
-      mask_[static_cast<std::size_t>(encodeAction(slot, rotation, gx, gy))] = legal ? 1 : 0;
+      const int action = encodeAction(slot, rotation, gx, gy);
+      if (legal && first < 0) {
+        first = action;
+        if (out == nullptr) return first;
+      }
+      if (out != nullptr) out[static_cast<std::size_t>(action)] = legal ? 1 : 0;
     }
   }
+  return first;
+}
+
+bool PackingEnv::newBinLegal(int rotation, int gx, int gy) const {
+  // Empty bin: legal wherever the item lies inside. With settling only (0, 0)
+  // is offered, since every spot settles into the same corner.
+  const Polygon& v = variants_[static_cast<std::size_t>(rotation)];
+  const int gxMax = config_.settle ? std::min(0, lastFittingCell(v.bounds().max.x)) : lastFittingCell(v.bounds().max.x);
+  const int gyMax = config_.settle ? std::min(0, lastFittingCell(v.bounds().max.y)) : lastFittingCell(v.bounds().max.y);
+  return gx >= 0 && gy >= 0 && gx <= gxMax && gy <= gyMax;
+}
+
+int PackingEnv::firstLegal(int slot, int rotation) const {
+  if (done_) return -1;
+  if (!config_.lazyMask) {
+    const int base = encodeAction(slot, rotation, 0, 0);
+    for (int k = 0; k < positions(); ++k) {
+      if (mask_[static_cast<std::size_t>(base + k)]) return base + k;
+    }
+    return -1;
+  }
+  if (slot == config_.openBins) {
+    for (int gy = 0; gy < grid(); ++gy) {
+      for (int gx = 0; gx < grid(); ++gx) {
+        if (newBinLegal(rotation, gx, gy)) return encodeAction(slot, rotation, gx, gy);
+      }
+    }
+    return -1;
+  }
+  if (slot < 0 || static_cast<std::size_t>(slot) >= open_.size()) return -1;
+  return scanSpots(slot, rotation, nullptr);
 }
 
 void PackingEnv::computeMask() {
@@ -240,18 +280,15 @@ void PackingEnv::computeMask() {
   // action per rotation instead of many duplicates (which would also make a
   // fresh policy open bins far too often).
   for (int r = 0; r < rotations(); ++r) {
-    const Polygon& v = variants_[static_cast<std::size_t>(r)];
-    const int gxMax = config_.settle ? std::min(0, lastFittingCell(v.bounds().max.x)) : lastFittingCell(v.bounds().max.x);
-    const int gyMax = config_.settle ? std::min(0, lastFittingCell(v.bounds().max.y)) : lastFittingCell(v.bounds().max.y);
-    for (int gy = 0; gy <= gyMax; ++gy) {
-      for (int gx = 0; gx <= gxMax; ++gx) {
-        mask_[static_cast<std::size_t>(encodeAction(config_.openBins, r, gx, gy))] = 1;
+    for (int gy = 0; gy < grid(); ++gy) {
+      for (int gx = 0; gx < grid(); ++gx) {
+        if (newBinLegal(r, gx, gy)) mask_[static_cast<std::size_t>(encodeAction(config_.openBins, r, gx, gy))] = 1;
       }
     }
   }
 
   const int tasks = static_cast<int>(open_.size()) * rotations();
-  const auto run = [&](int t) { computeMaskFor(t / rotations(), t % rotations()); };
+  const auto run = [&](int t) { scanSpots(t / rotations(), t % rotations(), mask_.data()); };
   const int workers = std::min(config_.maskThreads, tasks);
   if (workers <= 1) {
     for (int t = 0; t < tasks; ++t) run(t);
@@ -276,8 +313,17 @@ void PackingEnv::computeMask() {
 }
 
 bool PackingEnv::isLegal(int action) const {
-  return !done_ && action >= 0 && action < actionCount() &&
-         mask_[static_cast<std::size_t>(action)] != 0;
+  if (done_ || action < 0 || action >= actionCount()) return false;
+  if (!config_.lazyMask) return mask_[static_cast<std::size_t>(action)] != 0;
+  // Lazy: the same exact test, for this one spot.
+  const Action a = decodeAction(action);
+  if (a.slot == config_.openBins) return newBinLegal(a.rotation, a.gx, a.gy);
+  if (static_cast<std::size_t>(a.slot) >= open_.size()) return false;
+  const Polygon& v = variants_[static_cast<std::size_t>(a.rotation)];
+  if (a.gx > lastFittingCell(v.bounds().max.x) || a.gy > lastFittingCell(v.bounds().max.y)) return false;
+  const Polygon placed = v.translated(Point(cellOffset_[static_cast<std::size_t>(a.gx)],
+                                            cellOffset_[static_cast<std::size_t>(a.gy)]));
+  return open_[static_cast<std::size_t>(a.slot)].bin.canPlace(placed);
 }
 
 Polygon PackingEnv::anchorPlacement(int action) const {
@@ -343,6 +389,7 @@ StepResult PackingEnv::step(int action) {
 
 void PackingEnv::observe(std::uint8_t* binImages, std::uint8_t* itemImages, std::uint8_t* contactImages,
                          float* slotFeatures, float* globalFeatures, std::uint8_t* mask) const {
+  if (config_.lazyMask) throw std::logic_error("PackingEnv::observe: not available with lazyMask");
   const int size = config_.rasterSize;
   const std::size_t pixels = static_cast<std::size_t>(size) * size;
   for (int s = 0; s < slots(); ++s) {
@@ -447,19 +494,11 @@ int firstFitAction(const PackingEnv& env) {
 }
 
 int greedyBottomLeftAction(const PackingEnv& env) {
-  const std::vector<std::uint8_t>& mask = env.mask();
   for (int s = 0; s < env.slots(); ++s) {
     int best = -1;
     std::optional<Polygon> bestPlacement;
     for (int r = 0; r < env.rotations(); ++r) {
-      const int base = env.encodeAction(s, r, 0, 0);
-      int first = -1;
-      for (int k = 0; k < env.positions(); ++k) {
-        if (mask[static_cast<std::size_t>(base + k)]) {
-          first = base + k;
-          break;
-        }
-      }
+      const int first = env.firstLegal(s, r);
       if (first < 0) continue;
       Polygon p = env.simulate(first);
       if (!bestPlacement || p.bounds().max.y < bestPlacement->bounds().max.y ||

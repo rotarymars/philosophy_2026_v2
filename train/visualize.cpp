@@ -38,8 +38,8 @@ const char* kUsage = R"(polypack_visualize: stream one episode as JSON lines
                     reaches the lower bound, so the viewer shows them all
   --offline-patterns N  packing patterns for the offline reference that the
                     score divides by (default 16; 0 = skip it)
-  --min-items N     fewest items per episode (default 20)
-  --items N         most items per episode (default 100); the seed picks
+  --min-items N     fewest items per episode (default 501)
+  --items N         most items per episode (default 1000); the seed picks
                     the count in between
   Baselines only (a policy uses the settings it was trained with):
   --open-bins N     open bins (default 2)

@@ -33,7 +33,7 @@ packing, which sees every item first and tries many packing patterns).
 Lower is better; 1.0 = as good as the offline reference.
 
   --model PATH           checkpoint (default models/policy.pt)
-  --episodes N           number of episodes (default 32)
+  --episodes N           number of episodes (default 8)
   --seed-base N          episode i uses seed N + i (default 1000000007, the
                          training-time evaluation set; use another value for
                          unseen episodes)
@@ -42,8 +42,10 @@ Lower is better; 1.0 = as good as the offline reference.
   --greedy-baseline      also run the bottom-left-fill greedy baseline
   --offline-patterns N   packing patterns the offline reference tries per
                          episode (default 16)
-  --min-items N          fewest items per episode (default 20)
-  --items N              most items per episode (default 100); each episode
+  --offline-cache PATH   offline results are kept here and reused
+                         (default models/offline_cache.tsv; "" = off)
+  --min-items N          fewest items per episode (default 501)
+  --items N              most items per episode (default 1000); each episode
                          gets a random count in between, chosen by its seed.
                          The same for every model, whatever it was trained on
   --sample               sample from the policy instead of taking the argmax
@@ -128,7 +130,7 @@ int main(int argc, char** argv) {
       return 0;
     }
     const std::string modelPath = args.str("model", "models/policy.pt");
-    const int episodes = static_cast<int>(args.integer("episodes", 32));
+    const int episodes = static_cast<int>(args.integer("episodes", 8));
     const uint64_t seedBase = static_cast<uint64_t>(args.integer("seed-base", 1'000'000'007LL));
     const torch::Device device = pickDevice(args.str("device", "auto"));
     const int threads = static_cast<int>(args.integer("threads", std::max(1u, std::thread::hardware_concurrency())));
@@ -137,6 +139,7 @@ int main(int argc, char** argv) {
     const bool sample = args.has("sample");
     args.str("sample", "");
     const int offlinePatterns = static_cast<int>(args.integer("offline-patterns", kDefaultOfflinePatterns));
+    const std::string offlineCache = args.str("offline-cache", kDefaultOfflineCache);
     EnvConfig defaults;
     const int maxItems = static_cast<int>(args.integer("items", defaults.itemsPerEpisode));
     const int minItems = static_cast<int>(args.integer("min-items", defaults.minItemsPerEpisode));
@@ -167,7 +170,7 @@ int main(int argc, char** argv) {
     }
 
     const std::vector<OfflineResult> offline =
-        packOfflineEpisodes(meta.env, seedBase, episodes, offlinePatterns, threads);
+        offlineReference(meta.env, seedBase, episodes, offlinePatterns, threads, offlineCache);
 
     std::cout << "\nbins used per episode\n"
               << "episode  pieces  policy  first-fit" << (greedy ? "  greedy" : "")

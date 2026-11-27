@@ -51,9 +51,13 @@ struct EnvConfig {
   int grid = 16;          // placement grid: grid x grid spots per bin and rotation
   bool settle = true;     // slide down/left from the chosen spot after placing
   int rasterSize = 32;
-  int itemsPerEpisode = 100;    // most items an episode can have
-  int minItemsPerEpisode = 20;  // fewest; 0 or >= itemsPerEpisode means always itemsPerEpisode
+  int itemsPerEpisode = 1000;    // most items an episode can have
+  int minItemsPerEpisode = 501;  // fewest; 0 or >= itemsPerEpisode means always itemsPerEpisode
   int maskThreads = 1;    // threads for the legality mask (keep 1 when envs already run in parallel)
+  // Offline packer only: no full legality mask is built (mask() is empty and
+  // observe() is unavailable); legality is checked on demand by firstLegal()
+  // and step(), with the same exact tests, so results are identical.
+  bool lazyMask = false;
   GeneratorConfig generator;
 };
 
@@ -132,6 +136,9 @@ class PackingEnv {
 
   const std::vector<std::uint8_t>& mask() const noexcept { return mask_; }
   bool isLegal(int action) const;
+  // The first legal action (lowest row, then left-most spot) for this slot
+  // and rotation, or -1 if there is none. Works with or without lazyMask.
+  int firstLegal(int slot, int rotation) const;
 
   // The current item, rotated and put at the action's grid spot, before any
   // settling. Defined for every action index (it may lie outside the bin).
@@ -174,7 +181,11 @@ class PackingEnv {
   static Diagonals diagonalsOf(const Polygon& p);
   void nextItem();
   void computeMask();
-  void computeMaskFor(int slot, int rotation);
+  // Exact legality of the spots of one (open bin, rotation) pair, in action
+  // order. Writes them all to `out` when given; otherwise stops at the first
+  // legal one. Returns the first legal action, or -1.
+  int scanSpots(int slot, int rotation, std::uint8_t* out) const;
+  bool newBinLegal(int rotation, int gx, int gy) const;
   // Largest g >= 0 with g / grid + extent <= 1, or -1 if none.
   int lastFittingCell(const Rational& extent) const;
 

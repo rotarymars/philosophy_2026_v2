@@ -45,9 +45,11 @@ Run
   --threads N             CPU threads for the environments  (default: all cores)
   --seed N                                                  (default 1)
   --eval-every N          evaluate/save every N iterations  (default 10)
-  --eval-episodes N       fixed evaluation episodes         (default 32)
+  --eval-episodes N       fixed evaluation episodes         (default 8)
   --offline-patterns N    packing patterns the offline reference tries
                           per evaluation episode            (default 16)
+  --offline-cache PATH    offline results are kept here and reused
+                          (default models/offline_cache.tsv; "" = off)
 
 PPO
   --lr X (3e-4)  --gamma X (1.0)  --lambda X (0.95)  --clip X (0.2)
@@ -58,7 +60,7 @@ PPO
 
 Environment (new runs only)
   --open-bins N (2)  --grid N (16)  --raster N (32)
-  --min-items N (20)  --items N (100)  each episode has a random number of items
+  --min-items N (501)  --items N (1000)  each episode has a random number of items
                           in this range (--min-items 0: always --items)
   --settle 0|1 (1)        1: slide down/left from the chosen spot; 0: stay exactly there
   --min-vertices N (3)  --max-vertices N (8)
@@ -145,8 +147,9 @@ int main(int argc, char** argv) {
     const int threads = static_cast<int>(args.integer("threads", std::max(1u, std::thread::hardware_concurrency())));
     const uint64_t seed = static_cast<uint64_t>(args.integer("seed", 1));
     const int evalEvery = static_cast<int>(args.integer("eval-every", 10));
-    const int evalEpisodes = static_cast<int>(args.integer("eval-episodes", 32));
+    const int evalEpisodes = static_cast<int>(args.integer("eval-episodes", 8));
     const int offlinePatterns = static_cast<int>(args.integer("offline-patterns", kDefaultOfflinePatterns));
+    const std::string offlineCache = args.str("offline-cache", kDefaultOfflineCache);
 
     const double lr = args.real("lr", 3e-4);
     const double gamma = args.real("gamma", 1.0);
@@ -203,7 +206,8 @@ int main(int argc, char** argv) {
     std::cout << "Offline reference for " << evalEpisodes << " eval episodes (" << offlinePatterns
               << " packing patterns each)..." << std::flush;
     std::vector<int> offlineBins;
-    for (const OfflineResult& r : packOfflineEpisodes(envConfig, kEvalSeedBase, evalEpisodes, offlinePatterns, threads)) {
+    for (const OfflineResult& r :
+         offlineReference(envConfig, kEvalSeedBase, evalEpisodes, offlinePatterns, threads, offlineCache)) {
       offlineBins.push_back(r.bins);
     }
     double meanOffline = 0;

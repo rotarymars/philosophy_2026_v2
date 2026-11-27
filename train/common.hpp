@@ -5,6 +5,7 @@
 #include "model.hpp"
 
 #include "polypack/env.hpp"
+#include "polypack/offline.hpp"
 
 #include <torch/torch.h>
 
@@ -59,6 +60,17 @@ struct ObsBatch {
   static ObsBatch stack(const std::vector<ObsBatch>& steps);  // [T] x [N,...] -> [T*N,...]
   ObsBatch index(const torch::Tensor& indices) const;
 };
+
+// Offline reference results for the episodes with seeds seedBase ..
+// seedBase + count - 1, read from the cache file at `cachePath` when they are
+// there and computed (then appended to the file) when not. The offline
+// reference is deterministic, so a cached result is exactly what computing
+// it again would give; the cache key holds every setting it depends on.
+// Cached results carry bins, lowerBound and pattern (no packing).
+// An empty cachePath disables the cache.
+constexpr const char* kDefaultOfflineCache = "models/offline_cache.tsv";
+std::vector<OfflineResult> offlineReference(const EnvConfig& config, std::uint64_t seedBase, int count, int patterns,
+                                            int threads, const std::string& cachePath);
 
 // Fills row i of `out` from one environment.
 void observeInto(const PackingEnv& env, ObsBatch& out, int64_t i);

@@ -53,8 +53,8 @@ class Handler(BaseHTTPRequestHandler):
         if player not in ("policy", "firstfit", "greedy"):
             return self.send_body(400, "text/plain", b"bad player")
         cmd = [BINARY, "--player", player, "--seed", str(int(get("seed", "1"))),
-               "--min-items", str(int(get("minItems", "20"))),
-               "--items", str(int(get("maxItems", "100")))]
+               "--min-items", str(int(get("minItems", "501"))),
+               "--items", str(int(get("maxItems", "1000")))]
         if player == "policy":
             model = os.path.realpath(os.path.join(ROOT, get("model", "models/policy.pt")))
             if not model.startswith(os.path.join(ROOT, "models") + os.sep):

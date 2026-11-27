@@ -480,6 +480,35 @@ void testOffline() {
   }
   CHECK(shortSteps == 3);
 
+  // Lazy legality (used by the offline packer) agrees exactly with the full
+  // mask: same first legal spot for every slot and rotation, same isLegal.
+  {
+    EnvConfig full = config;
+    full.openBins = 4;
+    EnvConfig lazy = full;
+    lazy.lazyMask = true;
+    PackingEnv a(full), b(lazy);
+    a.reset(77);
+    b.reset(77);
+    std::mt19937 pick(5);
+    while (!a.done()) {
+      CHECK(b.mask().empty());
+      for (int sl = 0; sl < a.slots(); ++sl) {
+        for (int r = 0; r < a.rotations(); ++r) CHECK(a.firstLegal(sl, r) == b.firstLegal(sl, r));
+      }
+      for (int t = 0; t < 300; ++t) {
+        const int act = static_cast<int>(pick() % static_cast<unsigned>(a.actionCount()));
+        CHECK(a.isLegal(act) == b.isLegal(act));
+      }
+      const int act = greedyBottomLeftAction(a);
+      CHECK(act == greedyBottomLeftAction(b));
+      a.step(act);
+      b.step(act);
+    }
+    CHECK(b.done());
+    CHECK(packingIsValid(b));
+  }
+
   // Episode-length features: the policy's are honest guesses from the count
   // range; the critic's are the true values.
   {

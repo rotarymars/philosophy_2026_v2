@@ -42,7 +42,6 @@ enum class Rule { FirstFit, BestFit };
 // when no open bin takes the item).
 int chooseAction(const PackingEnv& env, Rule rule) {
   if (rule == Rule::FirstFit) return greedyBottomLeftAction(env);
-  const std::vector<std::uint8_t>& mask = env.mask();
   const int openCount = std::min(env.binsUsed(), env.config().openBins);
   const std::vector<Bin> bins = env.allBins();  // no bin is ever closed offline: slot s == bins[s]
   std::vector<int> slots(static_cast<std::size_t>(openCount));
@@ -55,14 +54,7 @@ int chooseAction(const PackingEnv& env, Rule rule) {
     int best = -1;
     std::optional<Polygon> bestPlacement;
     for (int r = 0; r < env.rotations(); ++r) {
-      const int base = env.encodeAction(s, r, 0, 0);
-      int first = -1;
-      for (int k = 0; k < env.positions(); ++k) {
-        if (mask[static_cast<std::size_t>(base + k)]) {
-          first = base + k;
-          break;
-        }
-      }
+      const int first = env.firstLegal(s, r);
       if (first < 0) continue;
       Polygon p = env.simulate(first);
       if (!bestPlacement || p.bounds().max.y < bestPlacement->bounds().max.y ||
@@ -150,6 +142,7 @@ PatternOutcome runPattern(const std::vector<Polygon>& items, const EnvConfig& co
   offline.minItemsPerEpisode = 0;
   offline.settle = true;
   offline.maskThreads = 1;
+  offline.lazyMask = true;  // only the first legal spot per bin and rotation is needed
   std::vector<Polygon> sequence;
   sequence.reserve(items.size());
   for (std::size_t i : pattern.order) sequence.push_back(items[i]);

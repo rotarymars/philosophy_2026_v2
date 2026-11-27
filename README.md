@@ -73,17 +73,17 @@ A CUDA libtorch also needs the NVIDIA driver and a CUDA toolkit (`nvcc`). The se
 
 ### Score
 
-Each episode has a random number of pieces, from 20 to 100 (`--min-items`, `--items`), with random shapes. The seed picks both the count and the shapes. The player never learns how many pieces are still to come. Every model is evaluated on the same piece range, whatever it was trained with.
+Each episode has a random number of pieces, from 501 to 1000 (`--min-items`, `--items`), with random shapes. The seed picks both the count and the shapes. The player never learns how many pieces are still to come. Every model is evaluated on the same piece range, whatever it was trained with.
 
 For each episode, an offline reference packs the same items while seeing all of them in advance and keeping every bin open. It tries many packing patterns and keeps the fewest bins:
 * item orders: largest area first, largest diameter first, largest bounding box first, arrival order, and seeded "noisy area" orders,
 * bin choice: first fit or best fit, each piece placed bottom-left.
 
-**score = mean over episodes of (bins used ÷ offline bins)**. Lower is better; 1.0 means as good as the offline reference. The exact optimum is too hard to compute, so the reference is the best packing found: below 1.0 is possible, though rare. When the reference equals ⌈total area⌉ it is proven optimal, and the evaluator reports how often that happens. `--offline-patterns N` sets how many patterns are tried (default 16; it stops early once a packing reaches the lower bound).
+**score = mean over episodes of (bins used ÷ offline bins)**. Lower is better; 1.0 means as good as the offline reference. The exact optimum is too hard to compute, so the reference is the best packing found: below 1.0 is possible, though rare. When the reference equals ⌈total area⌉ it is proven optimal, and the evaluator reports how often that happens. `--offline-patterns N` sets how many patterns are tried (default 16; it stops early once a packing reaches the lower bound). The offline reference is slow for long episodes (several minutes per pattern for ~750 pieces), so its results are saved in `models/offline_cache.tsv` and reused by later training runs and evaluations with the same settings (`--offline-cache ""` turns this off). Commit that file to share it between machines.
 
 ## The learning problem
 
-* **Episode:** a random number (20–100) of random star-shaped polygons arrive one at a time. Each must be placed immediately and permanently.
+* **Episode:** a random number (501–1000) of random star-shaped polygons arrive one at a time. Each must be placed immediately and permanently.
 * **Bins:** two bins stay open at a time (the bounded-space variant). Opening a third closes the oldest for good.
 * **Action:** `(slot, rotation, gx, gy)`, with 3 slots × 8 rotations × 16 × 16 spots = 6,144 actions. Slot 2 means "open a new bin". The 8 rotations are multiples of 90°, plus each of those plus about 45.24° (the exact 5-12-13 rotation). The piece's bounding box starts at `(gx/16, gy/16)`. A spot is legal only if the piece fits there without overlapping anything; every spot is checked exactly each step, with exact shortcuts that skip far-away pieces.
 * **What the network sees:** for each (bin, rotation) pair, the bin as a 32×32 picture, a "contact" picture (how snugly the piece would sit at each spot), the exact legality mask, and a thumbnail of the piece. It outputs one score per spot.

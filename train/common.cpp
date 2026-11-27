@@ -2,6 +2,11 @@
 
 #include <algorithm>
 #include <filesystem>
+#include <fstream>
+#include <iomanip>
+#include <iostream>
+#include <sstream>
+#include <unordered_map>
 #include <stdexcept>
 #include <thread>
 
@@ -145,6 +150,82 @@ void loadCheckpointWeights(const std::string& path, PolicyNet& model,
     torch::serialize::InputArchive opt;
     if (archive.try_read("optimizer", opt)) optimizer->load(opt);
   }
+}
+
+// ---- Offline reference cache ---------------------------------------------------
+
+namespace {
+
+// Bump when the offline packer changes in a way that changes its results.
+constexpr int kOfflineVersion = 1;
+
+std::string offlineKey(const EnvConfig& c, int patterns, std::uint64_t seed) {
+  const GeneratorConfig& g = c.generator;
+  std::ostringstream o;
+  o << std::setprecision(17) << "v" << kOfflineVersion << " grid" << c.grid << " items" << c.minItemsPerEpisode
+    << "-" << c.itemsPerEpisode << " verts" << g.minVertices << "-" << g.maxVertices << " radius" << g.minRadius
+    << "-" << g.maxRadius << " inner" << g.innerRatio << " res" << g.gridResolution << " patterns" << patterns
+    << " seed" << seed;
+  return o.str();
+}
+
+}  // namespace
+
+std::vector<OfflineResult> offlineReference(const EnvConfig& config, std::uint64_t seedBase, int count, int patterns,
+                                            int threads, const std::string& cachePath) {
+  std::unordered_map<std::string, OfflineResult> cached;
+  if (!cachePath.empty()) {
+    std::ifstream in(cachePath);
+    std::string line;
+    while (std::getline(in, line)) {
+      std::istringstream fields(line);
+      std::string key, bins, bound, pattern;
+      if (!std::getline(fields, key, '\t') || !std::getline(fields, bins, '\t') ||
+          !std::getline(fields, bound, '\t') || !std::getline(fields, pattern, '\t')) {
+        continue;
+      }
+      OfflineResult r;
+      r.bins = std::stoi(bins);
+      r.lowerBound = std::stoi(bound);
+      r.pattern = pattern;
+      cached[key] = r;
+    }
+  }
+
+  std::vector<OfflineResult> results(static_cast<std::size_t>(count));
+  std::vector<int> missing;
+  for (int i = 0; i < count; ++i) {
+    const auto it = cached.find(offlineKey(config, patterns, seedBase + static_cast<std::uint64_t>(i)));
+    if (it != cached.end()) {
+      results[static_cast<std::size_t>(i)] = it->second;
+    } else {
+      missing.push_back(i);
+    }
+  }
+  if (missing.empty()) return results;
+  if (!cachePath.empty() && missing.size() < static_cast<std::size_t>(count)) {
+    std::cout << "(" << count - static_cast<int>(missing.size()) << " of " << count << " from " << cachePath << ") "
+              << std::flush;
+  }
+
+  std::vector<std::vector<Polygon>> episodes;
+  for (int i : missing) episodes.push_back(episodeItems(config, seedBase + static_cast<std::uint64_t>(i)));
+  const std::vector<OfflineResult> computed = packOfflineEpisodes(episodes, config, patterns, threads);
+  std::ofstream out;
+  if (!cachePath.empty()) {
+    const std::filesystem::path p(cachePath);
+    if (p.has_parent_path()) std::filesystem::create_directories(p.parent_path());
+    out.open(cachePath, std::ios::app);
+  }
+  for (std::size_t k = 0; k < missing.size(); ++k) {
+    const int i = missing[k];
+    results[static_cast<std::size_t>(i)] = computed[k];
+    if (out) {
+      out << offlineKey(config, patterns, seedBase + static_cast<std::uint64_t>(i)) << '\t' << computed[k].bins << '\t'
+          << computed[k].lowerBound << '\t' << computed[k].pattern << '\n';
+    }
+  }
+  return results;
 }
 
 // ---- Observations -------------------------------------------------------------
