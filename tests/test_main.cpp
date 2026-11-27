@@ -3,6 +3,7 @@
 #include "polypack/polypack.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <functional>
 #include <iostream>
 #include <random>
@@ -478,6 +479,37 @@ void testOffline() {
     ++shortSteps;
   }
   CHECK(shortSteps == 3);
+
+  // Episode-length features: the policy's are honest guesses from the count
+  // range; the critic's are the true values.
+  {
+    EnvConfig range = config;
+    range.minItemsPerEpisode = 4;
+    range.itemsPerEpisode = 10;
+    const std::uint64_t seed = 21;
+    const std::vector<Polygon> its = episodeItems(range, seed);
+    const int n = static_cast<int>(its.size());
+    PackingEnv e(range);
+    e.reset(seed);
+    std::vector<std::uint8_t> bi(e.slots() * 32 * 32), ii(e.rotations() * 32 * 32),
+        ci(e.slots() * e.rotations() * 32 * 32), mk(e.actionCount());
+    std::vector<float> sf(e.slots() * PackingEnv::kSlotFeatures), gf(PackingEnv::kGlobalFeatures),
+        cf(PackingEnv::kCriticFeatures);
+    for (int k = 0; k < n; ++k) {
+      e.observe(bi.data(), ii.data(), ci.data(), sf.data(), gf.data(), mk.data());
+      e.criticFeatures(cf.data());
+      const int seen = k + 1;
+      const int from = std::max(4, seen);
+      CHECK(std::abs(gf[3] - (0.5 * (from + 10) - seen) / 10.0) < 1e-6);
+      CHECK(std::abs(gf[4] - (seen < 4 ? 0.0 : 1.0 / (10 - from + 1))) < 1e-6);
+      CHECK(std::abs(cf[0] - static_cast<double>(n - seen) / 10.0) < 1e-6);
+      double rest = 0;
+      for (int j = seen; j < n; ++j) rest += toDouble(its[static_cast<std::size_t>(j)].area());
+      CHECK(std::abs(cf[1] - rest) < 1e-5);
+      e.step(greedyBottomLeftAction(e));
+    }
+    CHECK(e.done());
+  }
 
   // Random episode lengths: the seed picks a count in [min, max], the env
   // ends after exactly that many items, and the items are a prefix of the

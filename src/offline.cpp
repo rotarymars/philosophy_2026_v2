@@ -79,6 +79,7 @@ int chooseAction(const PackingEnv& env, Rule rule) {
 
 struct Pattern {
   std::string name;
+  std::string description;
   std::vector<std::size_t> order;
   Rule rule;
 };
@@ -94,24 +95,33 @@ std::vector<Pattern> makePatterns(const std::vector<Polygon>& items, int count) 
   }
   std::vector<std::size_t> arrival(items.size());
   std::iota(arrival.begin(), arrival.end(), std::size_t{0});
-  std::vector<std::pair<std::string, std::vector<std::size_t>>> orders = {
-      {"area", descendingBy(area)},
-      {"diameter", descendingBy(diameter)},
-      {"bbox", descendingBy(boxArea)},
-      {"arrival", arrival}};
+  struct Order {
+    std::string name, description;
+    std::vector<std::size_t> order;
+  };
+  std::vector<Order> orders = {
+      {"area", "largest area first", descendingBy(area)},
+      {"diameter", "longest piece (widest vertex-to-vertex distance) first", descendingBy(diameter)},
+      {"bbox", "largest bounding box first", descendingBy(boxArea)},
+      {"arrival", "in arrival order", arrival}};
   std::mt19937_64 rng(0x9e3779b97f4a7c15ULL);  // fixed: same patterns every time
   while (static_cast<int>(orders.size()) * 2 < count) {
     std::vector<Rational> noisy;
     for (const Rational& a : area) {
       noisy.push_back(Rational(a * Rational(static_cast<long>(70 + rng() % 61), 100)));
     }
-    orders.emplace_back("noisy-area-" + std::to_string(orders.size() - 3), descendingBy(noisy));
+    orders.push_back({"noisy-area-" + std::to_string(orders.size() - 3),
+                      "roughly largest area first (each area times a random 0.7-1.3)", descendingBy(noisy)});
   }
   std::vector<Pattern> patterns;
-  for (const auto& [name, order] : orders) {
+  for (const Order& o : orders) {
     for (Rule rule : {Rule::FirstFit, Rule::BestFit}) {
       if (static_cast<int>(patterns.size()) >= count) return patterns;
-      patterns.push_back({name + (rule == Rule::FirstFit ? "/first-fit" : "/best-fit"), order, rule});
+      patterns.push_back({o.name + (rule == Rule::FirstFit ? "/first-fit" : "/best-fit"),
+                          "Pieces " + o.description + "; each goes into the " +
+                              (rule == Rule::FirstFit ? "oldest" : "fullest") +
+                              " bin it fits in (a new bin if none), at its lowest, left-most spot",
+                          o.order, rule});
     }
   }
   return patterns;
@@ -125,8 +135,15 @@ int lowerBoundOf(const std::vector<Polygon>& items) {
   return static_cast<int>(bound.get_si());
 }
 
-// Packs the items with one pattern; returns the bins.
-std::vector<Bin> runPattern(const std::vector<Polygon>& items, const EnvConfig& config, const Pattern& pattern) {
+struct PatternOutcome {
+  OfflinePatternRun run;
+  std::vector<Bin> bins;
+};
+
+// Packs the items with one pattern.
+PatternOutcome runPattern(const std::vector<Polygon>& items, const EnvConfig& config, const Pattern& pattern,
+                          const OfflineObserver* observer, int episode, int patternIndex) {
+  if (observer && observer->onStart) observer->onStart(episode, patternIndex);
   EnvConfig offline = config;
   offline.openBins = static_cast<int>(items.size());  // never close a bin
   offline.itemsPerEpisode = static_cast<int>(items.size());
@@ -138,8 +155,23 @@ std::vector<Bin> runPattern(const std::vector<Polygon>& items, const EnvConfig& 
   for (std::size_t i : pattern.order) sequence.push_back(items[i]);
   PackingEnv env(offline);
   env.resetWithItems(std::move(sequence));
-  while (!env.done()) env.step(chooseAction(env, pattern.rule));
-  return env.allBins();
+  OfflinePatternRun run;
+  run.name = pattern.name;
+  run.description = pattern.description;
+  while (!env.done()) {
+    const int action = chooseAction(env, pattern.rule);
+    const Action a = env.decodeAction(action);
+    // No bin is ever closed here, so slot s is bin s; the last slot opens a new one.
+    OfflinePlacement step{a.slot == offline.openBins ? env.binsUsed() : a.slot,
+                          static_cast<int>(pattern.order[static_cast<std::size_t>(env.itemsPlaced())]),
+                          env.simulate(action)};
+    env.step(action);
+    if (observer && observer->onPlace) observer->onPlace(episode, patternIndex, step);
+    run.steps.push_back(std::move(step));
+  }
+  run.bins = env.binsUsed();
+  if (observer && observer->onFinish) observer->onFinish(episode, patternIndex, run.bins);
+  return {std::move(run), env.allBins()};
 }
 
 void runTasks(int n, int threads, const std::function<void(int)>& fn) {
@@ -173,7 +205,8 @@ OfflineResult packOfflineEpisode(const EnvConfig& config, std::uint64_t seed, in
 }
 
 std::vector<OfflineResult> packOfflineEpisodes(const std::vector<std::vector<Polygon>>& episodes,
-                                               const EnvConfig& config, int patterns, int threads) {
+                                               const EnvConfig& config, int patterns, int threads,
+                                               bool stopAtLowerBound, const OfflineObserver* observer) {
   if (patterns < 1) throw std::invalid_argument("packOffline: patterns must be >= 1");
   const int n = static_cast<int>(episodes.size());
   std::vector<OfflineResult> results(episodes.size());
@@ -181,6 +214,14 @@ std::vector<OfflineResult> packOfflineEpisodes(const std::vector<std::vector<Pol
   for (std::size_t e = 0; e < episodes.size(); ++e) {
     pats[e] = makePatterns(episodes[e], patterns);
     results[e].lowerBound = lowerBoundOf(episodes[e]);
+    if (observer && observer->onPlan) {
+      std::vector<std::string> names, descriptions;
+      for (const Pattern& p : pats[e]) {
+        names.push_back(p.name);
+        descriptions.push_back(p.description);
+      }
+      observer->onPlan(static_cast<int>(e), names, descriptions);
+    }
   }
 
   // Round 1: the first pattern for every episode. Round 2: the other
@@ -188,34 +229,54 @@ std::vector<OfflineResult> packOfflineEpisodes(const std::vector<std::vector<Pol
   // threads as (episode, pattern) tasks. Keeping the smallest bin count and,
   // among equals, the earliest pattern gives the same answer as trying the
   // patterns one by one and stopping at the lower bound.
-  std::vector<std::vector<std::optional<std::vector<Bin>>>> packs(episodes.size());
+  // Without the early stop every pattern runs anyway, so all of them start at
+  // once (one round).
+  std::vector<std::vector<std::optional<PatternOutcome>>> packs(episodes.size());
   for (std::size_t e = 0; e < episodes.size(); ++e) packs[e].resize(pats[e].size());
-  runTasks(n, threads, [&](int e) {
-    const auto k = static_cast<std::size_t>(e);
-    if (!episodes[k].empty()) packs[k][0] = runPattern(episodes[k], config, pats[k][0]);
-  });
-  std::vector<std::pair<std::size_t, std::size_t>> tasks;
-  for (std::size_t e = 0; e < episodes.size(); ++e) {
-    if (episodes[e].empty()) continue;
-    if (static_cast<int>(packs[e][0]->size()) <= results[e].lowerBound) continue;
-    for (std::size_t p = 1; p < pats[e].size(); ++p) tasks.emplace_back(e, p);
+  if (!stopAtLowerBound) {
+    std::vector<std::pair<std::size_t, std::size_t>> all;
+    for (std::size_t e = 0; e < episodes.size(); ++e) {
+      if (episodes[e].empty()) continue;
+      for (std::size_t p = 0; p < pats[e].size(); ++p) all.emplace_back(e, p);
+    }
+    runTasks(static_cast<int>(all.size()), threads, [&](int t) {
+      const auto [e, p] = all[static_cast<std::size_t>(t)];
+      packs[e][p] = runPattern(episodes[e], config, pats[e][p], observer, static_cast<int>(e), static_cast<int>(p));
+    });
+  } else {
+    runTasks(n, threads, [&](int e) {
+      const auto k = static_cast<std::size_t>(e);
+      if (!episodes[k].empty()) packs[k][0] = runPattern(episodes[k], config, pats[k][0], observer, e, 0);
+    });
+    std::vector<std::pair<std::size_t, std::size_t>> tasks;
+    for (std::size_t e = 0; e < episodes.size(); ++e) {
+      if (episodes[e].empty()) continue;
+      if (packs[e][0]->run.bins <= results[e].lowerBound) {
+        if (observer && observer->onSkip) {
+          for (std::size_t p = 1; p < pats[e].size(); ++p) observer->onSkip(static_cast<int>(e), static_cast<int>(p));
+        }
+        continue;
+      }
+      for (std::size_t p = 1; p < pats[e].size(); ++p) tasks.emplace_back(e, p);
+    }
+    runTasks(static_cast<int>(tasks.size()), threads, [&](int t) {
+      const auto [e, p] = tasks[static_cast<std::size_t>(t)];
+      packs[e][p] = runPattern(episodes[e], config, pats[e][p], observer, static_cast<int>(e), static_cast<int>(p));
+    });
   }
-  runTasks(static_cast<int>(tasks.size()), threads, [&](int t) {
-    const auto [e, p] = tasks[static_cast<std::size_t>(t)];
-    packs[e][p] = runPattern(episodes[e], config, pats[e][p]);
-  });
 
   for (std::size_t e = 0; e < episodes.size(); ++e) {
     OfflineResult& r = results[e];
     for (std::size_t p = 0; p < packs[e].size(); ++p) {
       if (!packs[e][p]) continue;
       ++r.patternsTried;
-      const int bins = static_cast<int>(packs[e][p]->size());
-      if (r.packing.empty() || bins < r.bins) {
+      const int bins = packs[e][p]->run.bins;
+      if (r.runs.empty() || bins < r.bins) {
         r.bins = bins;
         r.pattern = pats[e][p].name;
-        r.packing = *packs[e][p];
+        r.packing = packs[e][p]->bins;
       }
+      r.runs.push_back(std::move(packs[e][p]->run));
     }
   }
   return results;

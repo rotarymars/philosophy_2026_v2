@@ -15,6 +15,7 @@
 #include "polypack/slide.hpp"
 
 #include <future>
+#include <mutex>
 #include <iostream>
 #include <optional>
 #include <sstream>
@@ -33,12 +34,14 @@ const char* kUsage = R"(polypack_visualize: stream one episode as JSON lines
   --seed N          episode seed (default 1)
   --sample          sample from the policy instead of taking the argmax
   --device NAME     auto | cpu | cuda (default cpu)
+  --offline-all 0|1 1 (default): try every offline pattern, even after one
+                    reaches the lower bound, so the viewer shows them all
   --offline-patterns N  packing patterns for the offline reference that the
                     score divides by (default 16; 0 = skip it)
-  Baselines only (a policy uses the settings it was trained with):
   --min-items N     fewest items per episode (default 20)
   --items N         most items per episode (default 100); the seed picks
                     the count in between
+  Baselines only (a policy uses the settings it was trained with):
   --open-bins N     open bins (default 2)
   --grid N          placement grid size (default 16)
   --settle 0|1      slide down/left after placing (default 1)
@@ -75,6 +78,14 @@ std::vector<Polygon> settlePath(Polygon p, const std::vector<Polygon>& obstacles
   return path;
 }
 
+// The offline packer reports from worker threads while the episode runs, so
+// every output line goes through here.
+std::mutex outMutex;
+void emit(const std::string& line) {
+  const std::lock_guard<std::mutex> lock(outMutex);
+  std::cout << line << std::flush;
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -91,6 +102,7 @@ int main(int argc, char** argv) {
     args.str("sample", "");
     const torch::Device device = pickDevice(args.str("device", "cpu"));
     const int offlinePatterns = static_cast<int>(args.integer("offline-patterns", kDefaultOfflinePatterns));
+    const bool offlineAll = args.integer("offline-all", 1) != 0;
     EnvConfig config;
     config.itemsPerEpisode = static_cast<int>(args.integer("items", config.itemsPerEpisode));
     config.minItemsPerEpisode = static_cast<int>(args.integer("min-items", config.minItemsPerEpisode));
@@ -118,25 +130,57 @@ int main(int argc, char** argv) {
     // A single episode: use every core for the legality mask.
     config.maskThreads = static_cast<int>(std::max(1u, std::thread::hardware_concurrency()));
 
-    // The offline reference (same items, all seen in advance, many packing
-    // patterns) is computed alongside the episode; the score divides by it.
-    std::future<OfflineResult> offline;
-    if (offlinePatterns > 0) {
-      offline = std::async(std::launch::async, [config, seed, offlinePatterns] {
-        return packOfflineEpisodes({episodeItems(config, seed)}, config, offlinePatterns,
-                                   config.maskThreads).front();
-      });
-    }
-
     PackingEnv env(config);
     env.reset(seed);
     const int G = env.grid();
-    std::cout.precision(9);
-    std::cout << "{\"type\":\"start\",\"player\":\"" << player << "\",\"seed\":" << seed
-              << ",\"openBins\":" << config.openBins << ",\"grid\":" << G
-              << ",\"settle\":" << (config.settle ? "true" : "false")
-              << ",\"rotations\":" << env.rotations() << ",\"items\":" << env.episodeItemCount() << "}\n"
-              << std::flush;
+    {
+      std::ostringstream o;
+      o << "{\"type\":\"start\",\"player\":\"" << player << "\",\"seed\":" << seed
+        << ",\"openBins\":" << config.openBins << ",\"grid\":" << G
+        << ",\"settle\":" << (config.settle ? "true" : "false")
+        << ",\"rotations\":" << env.rotations() << ",\"items\":" << env.episodeItemCount() << "}\n";
+      emit(o.str());
+    }
+
+    // The offline reference (same items, all seen in advance, many packing
+    // patterns) runs alongside the episode and reports every placement live;
+    // the score divides by its result.
+    OfflineObserver observer;
+    observer.onPlan = [](int, const std::vector<std::string>& names, const std::vector<std::string>& descriptions) {
+      std::ostringstream o;
+      o << "{\"type\":\"offlinePlan\",\"patterns\":[";
+      for (std::size_t i = 0; i < names.size(); ++i) {
+        o << (i ? "," : "") << "{\"name\":\"" << names[i] << "\",\"description\":\"" << descriptions[i] << "\"}";
+      }
+      o << "]}\n";
+      emit(o.str());
+    };
+    observer.onStart = [](int, int pattern) {
+      emit("{\"type\":\"offlineStart\",\"pattern\":" + std::to_string(pattern) + "}\n");
+    };
+    observer.onPlace = [](int, int pattern, const OfflinePlacement& step) {
+      std::ostringstream o;
+      o.precision(9);
+      o << "{\"type\":\"offlinePlace\",\"pattern\":" << pattern << ",\"bin\":" << step.bin
+        << ",\"item\":" << step.item << ",\"poly\":";
+      writePoly(o, step.placed);
+      o << "}\n";
+      emit(o.str());
+    };
+    observer.onFinish = [](int, int pattern, int bins) {
+      emit("{\"type\":\"offlineFinish\",\"pattern\":" + std::to_string(pattern) +
+           ",\"bins\":" + std::to_string(bins) + "}\n");
+    };
+    observer.onSkip = [](int, int pattern) {
+      emit("{\"type\":\"offlineSkip\",\"pattern\":" + std::to_string(pattern) + "}\n");
+    };
+    std::future<OfflineResult> offline;
+    if (offlinePatterns > 0) {
+      offline = std::async(std::launch::async, [config, seed, offlinePatterns, offlineAll, observer] {
+        return packOfflineEpisodes({episodeItems(config, seed)}, config, offlinePatterns,
+                                   config.maskThreads, !offlineAll, &observer).front();
+      });
+    }
 
     ObsBatch obs = ObsBatch::allocate(env, 1);
     while (!env.done()) {
@@ -210,7 +254,7 @@ int main(int argc, char** argv) {
       const std::vector<Bin> after = env.allBins();
       o << ",\"binsUsed\":" << env.binsUsed() << ",\"lowerBound\":" << env.areaLowerBound()
         << ",\"fill\":" << toDouble(after[static_cast<std::size_t>(targetBin)].fillRatio()) << "}\n";
-      std::cout << o.str() << std::flush;
+      emit(o.str());
     }
     double score = -1;
     if (offline.valid()) {
@@ -220,25 +264,16 @@ int main(int argc, char** argv) {
       o.precision(9);
       o << "{\"type\":\"offline\",\"bins\":" << r.bins << ",\"lowerBound\":" << r.lowerBound
         << ",\"pattern\":\"" << r.pattern << "\",\"patternsTried\":" << r.patternsTried
-        << ",\"proven\":" << (r.bins == r.lowerBound ? "true" : "false") << ",\"packing\":[";
-      for (std::size_t b = 0; b < r.packing.size(); ++b) {
-        o << (b ? "," : "") << '[';
-        const std::vector<Polygon>& items = r.packing[b].items();
-        for (std::size_t i = 0; i < items.size(); ++i) {
-          if (i) o << ',';
-          writePoly(o, items[i]);
-        }
-        o << ']';
-      }
-      o << "]}\n";
-      std::cout << o.str() << std::flush;
+        << ",\"proven\":" << (r.bins == r.lowerBound ? "true" : "false") << "}\n";
+      emit(o.str());
     }
-    std::cout << "{\"type\":\"done\",\"binsUsed\":" << env.binsUsed()
-              << ",\"lowerBound\":" << env.areaLowerBound() << ",\"score\":" << score << "}\n"
-              << std::flush;
+    std::ostringstream o;
+    o << "{\"type\":\"done\",\"binsUsed\":" << env.binsUsed() << ",\"lowerBound\":" << env.areaLowerBound()
+      << ",\"score\":" << score << "}\n";
+    emit(o.str());
     return 0;
   } catch (const std::exception& e) {
-    std::cout << "{\"type\":\"error\",\"message\":\"" << e.what() << "\"}\n" << std::flush;
+    emit(std::string("{\"type\":\"error\",\"message\":\"") + e.what() + "\"}\n");
     std::cerr << "error: " << e.what() << '\n';
     return 1;
   }

@@ -26,10 +26,26 @@
 #include "polypack/polygon.hpp"
 
 #include <cstdint>
+#include <functional>
 #include <string>
 #include <vector>
 
 namespace polypack {
+
+// One piece placed by a pattern: which bin it went into and where it ended up.
+struct OfflinePlacement {
+  int bin;
+  int item;  // index of the piece in arrival order
+  Polygon placed;
+};
+
+// What one packing pattern did.
+struct OfflinePatternRun {
+  std::string name;         // e.g. "area/first-fit"
+  std::string description;  // the same in plain words
+  int bins = 0;
+  std::vector<OfflinePlacement> steps;  // in the order the pattern placed them
+};
 
 struct OfflineResult {
   int bins = 0;           // bins of the best packing found
@@ -37,9 +53,23 @@ struct OfflineResult {
   std::string pattern;    // which pattern produced it, e.g. "area/first-fit"
   int patternsTried = 0;
   std::vector<Bin> packing;
+  std::vector<OfflinePatternRun> runs;  // every pattern tried, in pattern order
 };
 
 constexpr int kDefaultOfflinePatterns = 16;
+
+// Optional live report of what the offline packer is doing (for the viewer).
+// Callbacks run on worker threads, possibly several at once.
+struct OfflineObserver {
+  // Before anything runs: the patterns planned for an episode.
+  std::function<void(int episode, const std::vector<std::string>& names,
+                     const std::vector<std::string>& descriptions)> onPlan;
+  std::function<void(int episode, int pattern)> onStart;
+  std::function<void(int episode, int pattern, const OfflinePlacement& step)> onPlace;
+  std::function<void(int episode, int pattern, int bins)> onFinish;
+  // A pattern that will not run because an earlier one reached the lower bound.
+  std::function<void(int episode, int pattern)> onSkip;
+};
 
 // Packs `items` offline with up to `patterns` patterns, using the grid size
 // of `config` (settling is always on). Stops early once a packing reaches the
@@ -53,8 +83,13 @@ OfflineResult packOfflineEpisode(const EnvConfig& config, std::uint64_t seed,
 
 // packOffline for many episodes at once, spreading (episode, pattern) work
 // over `threads` threads. Same results as calling packOffline on each.
+// With stopAtLowerBound = false every pattern is tried even when an earlier
+// one already reached the lower bound (the best result is the same; this is
+// only for showing the patterns).
 std::vector<OfflineResult> packOfflineEpisodes(const std::vector<std::vector<Polygon>>& episodes,
-                                               const EnvConfig& config, int patterns, int threads);
+                                               const EnvConfig& config, int patterns, int threads,
+                                               bool stopAtLowerBound = true,
+                                               const OfflineObserver* observer = nullptr);
 // Episodes with seeds seedBase, seedBase + 1, ..., seedBase + count - 1.
 std::vector<OfflineResult> packOfflineEpisodes(const EnvConfig& config, std::uint64_t seedBase, int count,
                                                int patterns, int threads);

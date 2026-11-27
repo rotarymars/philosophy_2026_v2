@@ -25,6 +25,7 @@ struct ModelConfig {
   int rasterSize = 32;
   int slotFeatures = 3;
   int globalFeatures = 3;
+  int criticFeatures = 0;  // extra inputs of the value head only (0 in older models)
   int channels = 64;
 };
 
@@ -39,10 +40,13 @@ class PolicyNetImpl : public torch::nn::Module {
 
   // binImages [N,S,H,W] uint8, itemImages [N,R,H,W] uint8,
   // contactImages [N,S*R,H,W] uint8, slotFeatures [N,S,Fs] float,
-  // globalFeatures [N,Fg] float, mask [N, S*R*G*G] bool.
+  // globalFeatures [N,Fg] float, mask [N, S*R*G*G] bool,
+  // criticFeatures [N,Fc] float: seen by the value head only, so the policy
+  // (logits) never depends on them.
   PolicyOutput forward(const torch::Tensor& binImages, const torch::Tensor& itemImages,
                        const torch::Tensor& contactImages, const torch::Tensor& slotFeatures,
-                       const torch::Tensor& globalFeatures, const torch::Tensor& mask);
+                       const torch::Tensor& globalFeatures, const torch::Tensor& mask,
+                       const torch::Tensor& criticFeatures);
 
   const ModelConfig& config() const noexcept { return config_; }
 

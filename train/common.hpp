@@ -52,6 +52,7 @@ struct ObsBatch {
   torch::Tensor slotF;    // [N,S,Fs] float
   torch::Tensor globalF;  // [N,Fg] float
   torch::Tensor mask;     // [N,A] bool
+  torch::Tensor critic;   // [N,Fc] float, critic-only features (never shown to the policy)
 
   static ObsBatch allocate(const PackingEnv& like, int64_t n);
   ObsBatch to(const torch::Device& device) const;

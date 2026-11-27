@@ -76,7 +76,18 @@ struct Action {
 class PackingEnv {
  public:
   static constexpr int kSlotFeatures = 3;    // is open bin, is new-bin slot, fill ratio
-  static constexpr int kGlobalFeatures = 3;  // item area * 10, episode progress, open-bin load
+  // Global features (seen by the policy):
+  //   0 item area * 10, 1 items placed / itemsPerEpisode, 2 open-bin load,
+  //   3 expected items still to come after this one / itemsPerEpisode,
+  //   4 chance that this item is the last one.
+  // 3 and 4 follow from the item-count range alone (the count is uniform in
+  // [minItemsPerEpisode, itemsPerEpisode]), not from this episode's count.
+  static constexpr int kGlobalFeatures = 5;
+  // Critic-only features: what the episode really holds, for the value
+  // estimate during training. The policy never sees them.
+  //   0 items still to come after this one / itemsPerEpisode,
+  //   1 total area of those items (in bins).
+  static constexpr int kCriticFeatures = 2;
 
   explicit PackingEnv(EnvConfig config);
 
@@ -115,6 +126,9 @@ class PackingEnv {
   // only; legality always comes from the exact mask.
   void observe(std::uint8_t* binImages, std::uint8_t* itemImages, std::uint8_t* contactImages,
                float* slotFeatures, float* globalFeatures, std::uint8_t* mask) const;
+
+  // Writes the kCriticFeatures critic-only features.
+  void criticFeatures(float* out) const;
 
   const std::vector<std::uint8_t>& mask() const noexcept { return mask_; }
   bool isLegal(int action) const;
@@ -167,8 +181,10 @@ class PackingEnv {
   EnvConfig config_;
   std::vector<Rotation> rotations_;
   std::vector<Rational> cellOffset_;  // g / grid for g = 0..grid-1
-  std::mt19937_64 rng_;
-  std::vector<Polygon> fixedItems_;  // non-empty: items come from here, not from rng_
+  void startEpisode(std::vector<Polygon> items);
+
+  std::vector<Polygon> items_;      // the whole episode, in arrival order
+  std::vector<double> areaAfter_;   // areaAfter_[i] = total area of items i+1, i+2, ...
   std::deque<OpenBin> open_;
   std::vector<Bin> closed_;
   std::optional<Polygon> item_;

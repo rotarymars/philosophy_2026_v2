@@ -61,23 +61,18 @@ PackingEnv::PackingEnv(EnvConfig config)
   mask_.assign(static_cast<std::size_t>(actionCount()), 0);
 }
 
-void PackingEnv::reset(std::uint64_t seed) {
-  rng_.seed(seed);
-  fixedItems_.clear();
-  episodeLength_ = episodeLength(config_, seed);
-  open_.clear();
-  closed_.clear();
-  areaSeen_ = 0;
-  placed_ = 0;
-  binsUsed_ = 0;
-  done_ = false;
-  nextItem();
-}
+void PackingEnv::reset(std::uint64_t seed) { startEpisode(episodeItems(config_, seed)); }
 
 void PackingEnv::resetWithItems(std::vector<Polygon> items) {
   if (items.empty()) throw std::invalid_argument("PackingEnv::resetWithItems: no items");
-  episodeLength_ = static_cast<int>(items.size());
-  fixedItems_ = std::move(items);
+  startEpisode(std::move(items));
+}
+
+void PackingEnv::startEpisode(std::vector<Polygon> items) {
+  items_ = std::move(items);
+  episodeLength_ = static_cast<int>(items_.size());
+  areaAfter_.assign(items_.size(), 0.0);
+  for (std::size_t i = items_.size(); i-- > 1;) areaAfter_[i - 1] = areaAfter_[i] + toDouble(items_[i].area());
   open_.clear();
   closed_.clear();
   areaSeen_ = 0;
@@ -143,8 +138,7 @@ int PackingEnv::lastFittingCell(const Rational& extent) const {
 }
 
 void PackingEnv::nextItem() {
-  item_ = fixedItems_.empty() ? randomPolygon(rng_, config_.generator)
-                              : fixedItems_[static_cast<std::size_t>(placed_)];
+  item_ = items_[static_cast<std::size_t>(placed_)];
   areaSeen_ += item_->area();
 
   const int size = config_.rasterSize;
@@ -411,7 +405,25 @@ void PackingEnv::observe(std::uint8_t* binImages, std::uint8_t* itemImages, std:
   // not learn how many items are left.
   globalFeatures[1] = static_cast<float>(placed_) / static_cast<float>(config_.itemsPerEpisode);
   globalFeatures[2] = static_cast<float>(open_.size()) / static_cast<float>(config_.openBins);
+  // Items so far, counting the current one. Given that many have arrived,
+  // the count is uniform on [max(lo, seen), hi].
+  const int hi = config_.itemsPerEpisode;
+  const int lo = config_.minItemsPerEpisode <= 0 || config_.minItemsPerEpisode >= hi ? hi : config_.minItemsPerEpisode;
+  const int seen = placed_ + 1;
+  const int from = std::min(hi, std::max(lo, seen));
+  const double expectedLeft = std::max(0.0, 0.5 * (from + hi) - seen);
+  globalFeatures[3] = done_ ? 0.0f : static_cast<float>(expectedLeft / hi);
+  globalFeatures[4] = done_ || seen < lo ? 0.0f : static_cast<float>(1.0 / (hi - from + 1));
   std::memcpy(mask, mask_.data(), mask_.size());
+}
+
+void PackingEnv::criticFeatures(float* out) const {
+  if (done_) {
+    out[0] = out[1] = 0.0f;
+    return;
+  }
+  out[0] = static_cast<float>(episodeLength_ - placed_ - 1) / static_cast<float>(config_.itemsPerEpisode);
+  out[1] = static_cast<float>(areaAfter_[static_cast<std::size_t>(placed_)]);
 }
 
 int PackingEnv::areaLowerBound() const {

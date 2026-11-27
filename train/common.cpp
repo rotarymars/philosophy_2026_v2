@@ -17,6 +17,7 @@ ModelConfig modelConfigFor(const PackingEnv& env, int channels) {
   c.rasterSize = env.rasterSize();
   c.slotFeatures = PackingEnv::kSlotFeatures;
   c.globalFeatures = PackingEnv::kGlobalFeatures;
+  c.criticFeatures = PackingEnv::kCriticFeatures;
   c.channels = channels;
   return c;
 }
@@ -70,6 +71,7 @@ void saveCheckpoint(const std::string& path, PolicyNet& model, torch::optim::Opt
   putInt(archive, "model.rasterSize", meta.model.rasterSize);
   putInt(archive, "model.slotFeatures", meta.model.slotFeatures);
   putInt(archive, "model.globalFeatures", meta.model.globalFeatures);
+  putInt(archive, "model.criticFeatures", meta.model.criticFeatures);
   putInt(archive, "model.channels", meta.model.channels);
   putInt(archive, "iteration", meta.iteration);
   putInt(archive, "envSteps", meta.envSteps);
@@ -120,6 +122,7 @@ CheckpointMeta loadCheckpointMeta(const std::string& path) {
   m.model.rasterSize = static_cast<int>(getInt(archive, "model.rasterSize"));
   m.model.slotFeatures = static_cast<int>(getInt(archive, "model.slotFeatures"));
   m.model.globalFeatures = static_cast<int>(getInt(archive, "model.globalFeatures"));
+  m.model.criticFeatures = static_cast<int>(tryGetInt(archive, "model.criticFeatures", 0));
   m.model.channels = static_cast<int>(getInt(archive, "model.channels"));
   m.iteration = getInt(archive, "iteration");
   m.envSteps = getInt(archive, "envSteps");
@@ -155,16 +158,17 @@ ObsBatch ObsBatch::allocate(const PackingEnv& like, int64_t n) {
   b.slotF = torch::zeros({n, like.slots(), PackingEnv::kSlotFeatures}, torch::kFloat);
   b.globalF = torch::zeros({n, PackingEnv::kGlobalFeatures}, torch::kFloat);
   b.mask = torch::zeros({n, like.actionCount()}, torch::kBool);
+  b.critic = torch::zeros({n, PackingEnv::kCriticFeatures}, torch::kFloat);
   return b;
 }
 
 ObsBatch ObsBatch::to(const torch::Device& device) const {
   return {bins.to(device), items.to(device), contact.to(device), slotF.to(device), globalF.to(device),
-          mask.to(device)};
+          mask.to(device), critic.to(device)};
 }
 
 ObsBatch ObsBatch::stack(const std::vector<ObsBatch>& steps) {
-  std::vector<torch::Tensor> bins, items, contact, slotF, globalF, mask;
+  std::vector<torch::Tensor> bins, items, contact, slotF, globalF, mask, critic;
   for (const ObsBatch& s : steps) {
     bins.push_back(s.bins);
     items.push_back(s.items);
@@ -172,14 +176,16 @@ ObsBatch ObsBatch::stack(const std::vector<ObsBatch>& steps) {
     slotF.push_back(s.slotF);
     globalF.push_back(s.globalF);
     mask.push_back(s.mask);
+    critic.push_back(s.critic);
   }
   return {torch::cat(bins), torch::cat(items), torch::cat(contact), torch::cat(slotF), torch::cat(globalF),
-          torch::cat(mask)};
+          torch::cat(mask), torch::cat(critic)};
 }
 
 ObsBatch ObsBatch::index(const torch::Tensor& idx) const {
   return {bins.index_select(0, idx), items.index_select(0, idx), contact.index_select(0, idx),
-          slotF.index_select(0, idx), globalF.index_select(0, idx), mask.index_select(0, idx)};
+          slotF.index_select(0, idx), globalF.index_select(0, idx), mask.index_select(0, idx),
+          critic.index_select(0, idx)};
 }
 
 void observeInto(const PackingEnv& env, ObsBatch& out, int64_t i) {
@@ -190,6 +196,7 @@ void observeInto(const PackingEnv& env, ObsBatch& out, int64_t i) {
               out.slotF.data_ptr<float>() + i * out.slotF.stride(0),
               out.globalF.data_ptr<float>() + i * out.globalF.stride(0),
               reinterpret_cast<uint8_t*>(out.mask.data_ptr<bool>()) + i * out.mask.stride(0));
+  env.criticFeatures(out.critic.data_ptr<float>() + i * out.critic.stride(0));
 }
 
 void observeAll(const std::vector<PackingEnv>& envs, ObsBatch& out, int threads) {
@@ -214,7 +221,11 @@ ObsBatch observeSome(const std::vector<PackingEnv>& envs, const std::vector<int>
 }
 
 PolicyOutput runModel(PolicyNet& model, const ObsBatch& b) {
-  return model->forward(b.bins, b.items, b.contact, b.slotF, b.globalF, b.mask);
+  // Older models take fewer global features (the first ones keep their
+  // meaning) and no critic features.
+  const ModelConfig& c = model->config();
+  return model->forward(b.bins, b.items, b.contact, b.slotF, b.globalF.narrow(1, 0, c.globalFeatures), b.mask,
+                        b.critic.narrow(1, 0, c.criticFeatures));
 }
 
 // ---- Misc ---------------------------------------------------------------------

@@ -18,7 +18,7 @@ PolicyNetImpl::PolicyNetImpl(const ModelConfig& c) : config_(c) {
                                torch::nn::Linear(c.slotFeatures + c.globalFeatures + summary, ch));
   policy1_ = register_module("policy1", torch::nn::Conv2d(torch::nn::Conv2dOptions(ch, ch, 3).padding(1)));
   policy2_ = register_module("policy2", torch::nn::Conv2d(torch::nn::Conv2dOptions(ch, 1, 1)));
-  value1_ = register_module("value1", torch::nn::Linear(2 * ch + c.globalFeatures, 128));
+  value1_ = register_module("value1", torch::nn::Linear(2 * ch + c.globalFeatures + c.criticFeatures, 128));
   value2_ = register_module("value2", torch::nn::Linear(128, 1));
 
   // Start close to a uniform policy over legal actions.
@@ -30,7 +30,8 @@ PolicyNetImpl::PolicyNetImpl(const ModelConfig& c) : config_(c) {
 PolicyOutput PolicyNetImpl::forward(const torch::Tensor& binImages, const torch::Tensor& itemImages,
                                     const torch::Tensor& contactImages,
                                     const torch::Tensor& slotFeatures,
-                                    const torch::Tensor& globalFeatures, const torch::Tensor& mask) {
+                                    const torch::Tensor& globalFeatures, const torch::Tensor& mask,
+                                    const torch::Tensor& criticFeatures) {
   const int64_t n = binImages.size(0);
   const int64_t s = config_.slots;
   const int64_t r = config_.rotations;
@@ -85,7 +86,8 @@ PolicyOutput PolicyNetImpl::forward(const torch::Tensor& binImages, const torch:
 
   // Value: pool over all (slot, rotation) pairs.
   const torch::Tensor pooled = x.mean({2, 3}).view({n, s * r, -1});
-  const torch::Tensor v = torch::cat({pooled.mean(1), std::get<0>(pooled.max(1)), globalFeatures}, 1);
+  const torch::Tensor v =
+      torch::cat({pooled.mean(1), std::get<0>(pooled.max(1)), globalFeatures, criticFeatures}, 1);
   torch::Tensor value = value2_(torch::relu(value1_(v))).squeeze(-1);
 
   return {logits, value};

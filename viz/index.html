@@ -31,7 +31,16 @@
   #offline { padding:0 16px 24px; }
   #offline h2 { font-size:14px; margin:0 0 4px; }
   #offline p { margin:0 0 8px; color:var(--mute); font-size:12px; }
-  #offlineBins { display:flex; flex-wrap:wrap; gap:14px; }
+  #patterns { display:flex; flex-wrap:wrap; gap:10px; }
+  .pat { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:6px 8px; }
+  .pat.running { border-color:var(--accent); }
+  .pat.best { border-color:var(--ok); box-shadow:0 0 0 1px var(--ok); }
+  .pat.skipped { opacity:.45; }
+  .pat .head { display:flex; justify-content:space-between; gap:10px; font-size:12px; margin-bottom:4px; }
+  .pat .head .st { color:var(--mute); font-variant-numeric:tabular-nums; }
+  .pat .mini { display:flex; flex-wrap:wrap; gap:4px; max-width:340px; min-height:20px; }
+  .pat .mini .bin { padding:2px; border-radius:4px; }
+  .pat .mini .bin .cap { display:none; }
 </style>
 </head>
 <body>
@@ -69,9 +78,9 @@
 </div>
 <div id="bins"></div>
 <div id="offline" hidden>
-  <h2>Offline reference: the same pieces, all known in advance</h2>
+  <h2>Offline reference (live): the same pieces, all known in advance</h2>
   <p id="offlineInfo"></p>
-  <div id="offlineBins"></div>
+  <div id="patterns"></div>
 </div>
 
 <script>
@@ -200,7 +209,6 @@ function tick(now) {
     if (!current && queue.length) {
       const msg = queue.shift();
       if (msg.type === "step") startStep(msg);
-      else if (msg.type === "offline") showOffline(msg);
       else if (msg.type === "done") {
         bins.forEach(b => b.closed = false);
         let txt = `Done: ${msg.binsUsed} bins (area lower bound ${msg.lowerBound})`;
@@ -230,29 +238,73 @@ function tick(now) {
 }
 requestAnimationFrame(tick);
 
-function showOffline(msg) {
-  $("sOff").textContent = `${msg.bins} bins`;
+// Offline reference, live: every packing pattern (an item order plus a
+// bin-choice rule) runs at the same time as the episode, and each placement
+// is drawn the moment the packer makes it.
+let offline = null;  // { pats: [{ name, description, div, st, bins, placed, bins count }], total }
+
+function offlinePlan(msg) {
   $("offline").hidden = false;
-  $("offlineInfo").textContent =
-    `Fewest bins found: ${msg.bins} (best of ${msg.patternsTried} packing pattern${msg.patternsTried > 1 ? "s" : ""}; ` +
-    `best: ${msg.pattern}). ` +
-    (msg.proven ? "This equals the area lower bound, so it is optimal." : `The area lower bound is ${msg.lowerBound}, so this may not be optimal.`);
-  $("offlineBins").innerHTML = "";
-  let n = 0;
-  msg.packing.forEach((items, i) => {
-    const b = makeBin(i, $("offlineBins"), 0.6);
-    b.items = items.map(pts => ({ pts, n: n++ }));
-    b.fill = 0;
-    drawBin(b, -1);
-    b.div.classList.remove("open");
-    b.div.querySelector(".fill").textContent = `${items.length} pieces`;
+  $("patterns").innerHTML = "";
+  offline = { total: meta ? meta.items : 0, pats: [] };
+  msg.patterns.forEach(p => {
+    const div = document.createElement("div");
+    div.className = "pat";
+    div.title = p.description;
+    div.innerHTML = `<div class="head"><span>${p.name}</span><span class="st">waiting</span></div><div class="mini"></div>`;
+    $("patterns").appendChild(div);
+    offline.pats.push({ ...p, div, st: div.querySelector(".st"), mini: div.querySelector(".mini"), bins: [], placed: 0, last: null, result: null });
   });
+  $("offlineInfo").textContent = `The same pieces, all known in advance, packed with ${msg.patterns.length} patterns at once (hover a pattern for what it does). ` +
+    `Name = piece order / bin rule. Running live…`;
+}
+
+function drawMini(p, b) {
+  const bin = p.bins[b];
+  drawBin(bin, -1);
+  bin.div.classList.remove("open");
+  if (p.last && p.last.bin === b) drawPoly(bin.canvas.getContext("2d"), p.last.pts, null, css("--accent"), 0, 2.5);
+}
+
+function offlineEvent(msg) {
+  if (!offline) return;
+  const p = offline.pats[msg.pattern];
+  if (msg.type === "offlineStart") { p.div.classList.add("running"); p.st.textContent = "starting"; }
+  else if (msg.type === "offlineSkip") { p.div.classList.add("skipped"); p.st.textContent = "skipped (already optimal)"; }
+  else if (msg.type === "offlinePlace") {
+    while (p.bins.length <= msg.bin) p.bins.push(makeBin(p.bins.length, p.mini, 0.3));
+    const prev = p.last ? p.last.bin : -1;
+    p.last = { bin: msg.bin, pts: msg.poly };
+    p.bins[msg.bin].items.push({ pts: msg.poly, n: msg.item });
+    p.placed++;
+    drawMini(p, msg.bin);
+    if (prev >= 0 && prev !== msg.bin) drawMini(p, prev);
+    p.st.textContent = `piece ${p.placed}${offline.total ? " / " + offline.total : ""} · ${p.bins.length} bin${p.bins.length > 1 ? "s" : ""}`;
+  } else if (msg.type === "offlineFinish") {
+    p.result = msg.bins;
+    p.div.classList.remove("running");
+    const b = p.last ? p.last.bin : -1;
+    p.last = null;
+    if (b >= 0) drawMini(p, b);
+    p.st.textContent = `done · ${msg.bins} bin${msg.bins > 1 ? "s" : ""}`;
+  }
+}
+
+function offlineDone(msg) {
+  $("sOff").textContent = `${msg.bins} bins`;
+  if (!offline) return;
+  offline.pats.forEach(p => {
+    if (p.result === msg.bins) { p.div.classList.add("best"); p.st.textContent += " ★"; }
+  });
+  $("offlineInfo").textContent = `${msg.patternsTried} patterns tried; the fewest bins is ${msg.bins} (★, first reached by ${msg.pattern}). ` +
+    (msg.proven ? "That equals the area lower bound, so it is optimal." : `The area lower bound is ${msg.lowerBound}, so it may not be optimal.`) +
+    " Hover a pattern for what it does; colors match the pieces above.";
 }
 
 function start() {
   if (es) es.close();
   queue = []; current = null; bins = []; $("bins").innerHTML = ""; paused = false;
-  $("offline").hidden = true; $("offlineBins").innerHTML = "";
+  $("offline").hidden = true; $("patterns").innerHTML = ""; offline = null;
   $("pause").textContent = "Pause";
   $("status").textContent = "running…"; $("action").textContent = "";
   ["sItem", "sBins", "sLB", "sLegal", "sOff", "sScore"].forEach(id => $(id).textContent = "–");
@@ -266,6 +318,9 @@ function start() {
     const msg = JSON.parse(e.data);
     if (msg.type === "start") { meta = msg; $("legProb").hidden = msg.player !== "policy"; }
     else if (msg.type === "error") { $("status").textContent = "Error: " + msg.message; es.close(); }
+    else if (msg.type === "offlinePlan") offlinePlan(msg);
+    else if (msg.type.startsWith("offline") && msg.type !== "offline") offlineEvent(msg);
+    else if (msg.type === "offline") offlineDone(msg);
     else { queue.push(msg); if (msg.type === "done") es.close(); }
   };
   es.onerror = () => es.close();
