@@ -1,205 +1,205 @@
 Device cuda, 44114 parameters, 6144 actions (3 slots x 8 rotations x 16x16 spots, settling)
-Offline reference for 32 eval episodes (16 packing patterns each)... 2.000 bins
+Offline reference for 32 eval episodes (16 packing patterns each)... 2.094 bins
 Score = mean(bins used / offline bins), lower is better, 1.0 = matches offline
-First-fit baseline: score 1.172 (2.344 bins, area lower bound 1.750)
-iter 1 | steps 2048 | episodes 32 bins 3.312 (lb 1.781) | pi -0.000 v 0.189 H 6.313 kl -0.000 | env 19.077s learn 18.183s
-iter 2 | steps 4096 | episodes 32 bins 3.125 (lb 1.844) | pi -0.001 v 0.182 H 6.396 kl 0.000 | env 17.809s learn 18.148s
-iter 3 | steps 6144 | episodes 32 bins 3.250 (lb 1.781) | pi -0.001 v 0.175 H 6.403 kl 0.002 | env 18.177s learn 18.168s
-iter 4 | steps 8192 | episodes 32 bins 3.125 (lb 1.844) | pi -0.003 v 0.155 H 6.272 kl 0.002 | env 21.322s learn 18.211s
-iter 5 | steps 10240 | episodes 32 bins 3.156 (lb 1.781) | pi -0.003 v 0.111 H 6.197 kl 0.005 | env 21.031s learn 18.210s | eval score 1.203 (2.406 bins; first-fit 1.172) * saved best
-iter 6 | steps 12288 | episodes 32 bins 3.000 (lb 1.875) | pi -0.001 v 0.071 H 6.078 kl -0.000 | env 21.635s learn 18.227s
-iter 7 | steps 14336 | episodes 32 bins 3.188 (lb 1.844) | pi -0.001 v 0.041 H 6.094 kl 0.000 | env 19.552s learn 18.257s
-iter 8 | steps 16384 | episodes 32 bins 3.000 (lb 1.844) | pi -0.003 v 0.032 H 6.047 kl 0.002 | env 21.722s learn 18.264s
-iter 9 | steps 18432 | episodes 32 bins 3.094 (lb 1.844) | pi -0.002 v 0.020 H 6.018 kl 0.001 | env 21.014s learn 18.284s
-iter 10 | steps 20480 | episodes 32 bins 3.062 (lb 1.875) | pi -0.003 v 0.014 H 6.069 kl 0.005 | env 21.803s learn 18.318s | eval score 1.188 (2.375 bins; first-fit 1.172) * saved best
-iter 11 | steps 22528 | episodes 32 bins 3.000 (lb 1.781) | pi -0.004 v 0.012 H 5.894 kl 0.004 | env 22.755s learn 18.286s
-iter 12 | steps 24576 | episodes 32 bins 2.969 (lb 1.906) | pi -0.002 v 0.014 H 5.871 kl 0.002 | env 23.288s learn 18.314s
-iter 13 | steps 26624 | episodes 32 bins 3.031 (lb 1.938) | pi -0.002 v 0.011 H 5.876 kl 0.003 | env 19.920s learn 18.338s
-iter 14 | steps 28672 | episodes 32 bins 3.000 (lb 1.938) | pi -0.003 v 0.008 H 5.967 kl 0.001 | env 22.046s learn 18.315s
-iter 15 | steps 30720 | episodes 64 bins 2.969 (lb 1.812) | pi -0.003 v 0.008 H 5.934 kl 0.001 | env 24.200s learn 18.315s | eval score 1.156 (2.312 bins; first-fit 1.172) * saved best
-iter 16 | steps 32768 | episodes 32 bins 2.938 (lb 1.844) | pi -0.002 v 0.008 H 5.920 kl 0.002 | env 20.561s learn 18.335s
-iter 17 | steps 34816 | episodes 32 bins 3.000 (lb 1.875) | pi -0.006 v 0.006 H 5.953 kl 0.000 | env 21.885s learn 18.321s
-iter 18 | steps 36864 | episodes 32 bins 3.000 (lb 1.875) | pi -0.004 v 0.008 H 5.859 kl -0.000 | env 20.624s learn 18.334s
-iter 19 | steps 38912 | episodes 32 bins 2.906 (lb 1.812) | pi -0.002 v 0.010 H 5.888 kl -0.000 | env 22.176s learn 18.326s
-iter 20 | steps 40960 | episodes 32 bins 2.906 (lb 1.844) | pi -0.002 v 0.011 H 5.695 kl 0.001 | env 25.164s learn 18.319s | eval score 1.188 (2.375 bins; first-fit 1.172)
-iter 21 | steps 43008 | episodes 32 bins 2.969 (lb 1.781) | pi -0.003 v 0.011 H 5.753 kl 0.002 | env 24.280s learn 18.324s
-iter 22 | steps 45056 | episodes 32 bins 2.938 (lb 1.844) | pi -0.004 v 0.010 H 5.676 kl 0.003 | env 25.048s learn 18.353s
-iter 23 | steps 47104 | episodes 32 bins 2.906 (lb 1.812) | pi -0.004 v 0.010 H 5.689 kl 0.005 | env 26.282s learn 18.350s
-iter 24 | steps 49152 | episodes 32 bins 2.875 (lb 1.781) | pi -0.003 v 0.011 H 5.725 kl 0.002 | env 23.642s learn 18.351s
-iter 25 | steps 51200 | episodes 32 bins 3.000 (lb 1.875) | pi -0.005 v 0.008 H 5.625 kl 0.004 | env 22.126s learn 18.357s | eval score 1.219 (2.438 bins; first-fit 1.172)
-iter 26 | steps 53248 | episodes 32 bins 2.844 (lb 1.812) | pi -0.003 v 0.010 H 5.610 kl -0.000 | env 22.989s learn 18.366s
-iter 27 | steps 55296 | episodes 32 bins 2.938 (lb 1.844) | pi -0.004 v 0.010 H 5.576 kl 0.002 | env 26.612s learn 18.359s
-iter 28 | steps 57344 | episodes 32 bins 2.969 (lb 1.938) | pi -0.003 v 0.008 H 5.618 kl 0.003 | env 23.900s learn 18.360s
-iter 29 | steps 59392 | episodes 32 bins 2.969 (lb 1.875) | pi -0.004 v 0.008 H 5.587 kl -0.000 | env 23.350s learn 18.382s
-iter 30 | steps 61440 | episodes 64 bins 2.906 (lb 1.844) | pi -0.001 v 0.010 H 5.643 kl 0.004 | env 23.167s learn 18.379s | eval score 1.219 (2.438 bins; first-fit 1.172)
-iter 31 | steps 63488 | episodes 32 bins 2.906 (lb 1.875) | pi -0.002 v 0.009 H 5.618 kl 0.004 | env 22.681s learn 18.365s
-iter 32 | steps 65536 | episodes 32 bins 2.938 (lb 1.938) | pi -0.003 v 0.008 H 5.714 kl 0.004 | env 22.932s learn 18.382s
-iter 33 | steps 67584 | episodes 32 bins 2.969 (lb 1.906) | pi -0.003 v 0.007 H 5.716 kl 0.001 | env 23.048s learn 18.382s
-iter 34 | steps 69632 | episodes 32 bins 2.906 (lb 1.812) | pi -0.003 v 0.009 H 5.674 kl 0.002 | env 26.308s learn 18.377s
-iter 35 | steps 71680 | episodes 32 bins 2.844 (lb 1.844) | pi -0.006 v 0.012 H 5.599 kl 0.006 | env 23.230s learn 18.371s | eval score 1.188 (2.375 bins; first-fit 1.172)
-iter 36 | steps 73728 | episodes 32 bins 2.844 (lb 1.844) | pi -0.005 v 0.012 H 5.442 kl 0.002 | env 26.591s learn 18.373s
-iter 37 | steps 75776 | episodes 32 bins 2.906 (lb 1.969) | pi -0.005 v 0.009 H 5.471 kl 0.003 | env 24.474s learn 18.383s
-iter 38 | steps 77824 | episodes 32 bins 2.938 (lb 2.000) | pi -0.003 v 0.009 H 5.564 kl 0.005 | env 24.594s learn 18.368s
-iter 39 | steps 79872 | episodes 32 bins 2.875 (lb 1.969) | pi -0.004 v 0.010 H 5.597 kl 0.001 | env 26.633s learn 18.373s
-iter 40 | steps 81920 | episodes 32 bins 2.938 (lb 1.906) | pi -0.002 v 0.008 H 5.558 kl 0.004 | env 23.231s learn 18.391s | eval score 1.156 (2.312 bins; first-fit 1.172)
-iter 41 | steps 83968 | episodes 32 bins 2.969 (lb 1.938) | pi -0.004 v 0.005 H 5.599 kl 0.005 | env 24.398s learn 18.359s
-iter 42 | steps 86016 | episodes 32 bins 2.812 (lb 1.781) | pi -0.004 v 0.010 H 5.459 kl 0.005 | env 24.681s learn 18.360s
-iter 43 | steps 88064 | episodes 32 bins 2.781 (lb 1.875) | pi -0.005 v 0.011 H 5.508 kl 0.006 | env 27.330s learn 18.376s
-iter 44 | steps 90112 | episodes 32 bins 2.875 (lb 1.875) | pi -0.006 v 0.009 H 5.403 kl 0.004 | env 25.491s learn 18.379s
-iter 45 | steps 92160 | episodes 64 bins 2.953 (lb 1.922) | pi -0.004 v 0.009 H 5.426 kl 0.007 | env 23.566s learn 18.373s | eval score 1.156 (2.312 bins; first-fit 1.172)
-iter 46 | steps 94208 | episodes 32 bins 2.938 (lb 1.938) | pi -0.004 v 0.010 H 5.445 kl 0.007 | env 22.163s learn 18.376s
-iter 47 | steps 96256 | episodes 32 bins 2.781 (lb 1.812) | pi -0.003 v 0.011 H 5.410 kl 0.005 | env 23.524s learn 18.369s
-iter 48 | steps 98304 | episodes 32 bins 2.906 (lb 1.938) | pi -0.003 v 0.008 H 5.321 kl 0.006 | env 27.554s learn 18.375s
-iter 49 | steps 100352 | episodes 32 bins 2.781 (lb 1.844) | pi -0.004 v 0.013 H 5.309 kl 0.002 | env 28.691s learn 18.370s
-iter 50 | steps 102400 | episodes 32 bins 2.812 (lb 1.844) | pi -0.006 v 0.011 H 5.353 kl 0.003 | env 23.600s learn 18.374s | eval score 1.156 (2.312 bins; first-fit 1.172)
-iter 51 | steps 104448 | episodes 32 bins 2.875 (lb 1.906) | pi -0.007 v 0.010 H 5.294 kl 0.006 | env 22.998s learn 18.388s
-iter 52 | steps 106496 | episodes 32 bins 2.844 (lb 1.875) | pi -0.007 v 0.012 H 5.274 kl 0.008 | env 27.470s learn 18.394s
-iter 53 | steps 108544 | episodes 32 bins 2.688 (lb 1.719) | pi -0.005 v 0.013 H 5.291 kl 0.004 | env 29.124s learn 18.372s
-iter 54 | steps 110592 | episodes 32 bins 2.906 (lb 1.844) | pi -0.005 v 0.011 H 5.291 kl 0.003 | env 30.604s learn 18.349s
-iter 55 | steps 112640 | episodes 32 bins 2.844 (lb 1.906) | pi -0.003 v 0.012 H 5.233 kl 0.005 | env 31.417s learn 18.366s | eval score 1.203 (2.406 bins; first-fit 1.172)
-iter 56 | steps 114688 | episodes 32 bins 2.781 (lb 1.844) | pi -0.005 v 0.013 H 5.218 kl 0.004 | env 29.757s learn 18.374s
-iter 57 | steps 116736 | episodes 32 bins 2.844 (lb 1.844) | pi -0.007 v 0.010 H 5.214 kl 0.002 | env 29.523s learn 18.382s
-iter 58 | steps 118784 | episodes 32 bins 2.844 (lb 1.844) | pi -0.005 v 0.010 H 5.141 kl 0.005 | env 27.449s learn 18.357s
-iter 59 | steps 120832 | episodes 32 bins 2.906 (lb 1.938) | pi -0.005 v 0.007 H 5.117 kl 0.001 | env 26.231s learn 18.375s
-iter 60 | steps 122880 | episodes 64 bins 2.719 (lb 1.828) | pi -0.006 v 0.018 H 5.085 kl 0.007 | env 29.409s learn 18.357s | eval score 1.172 (2.344 bins; first-fit 1.172)
-iter 61 | steps 124928 | episodes 32 bins 2.844 (lb 1.938) | pi -0.002 v 0.013 H 5.173 kl 0.003 | env 28.755s learn 18.354s
-iter 62 | steps 126976 | episodes 32 bins 2.719 (lb 1.844) | pi -0.006 v 0.015 H 5.215 kl 0.008 | env 25.213s learn 18.347s
-iter 63 | steps 129024 | episodes 32 bins 2.844 (lb 1.781) | pi -0.005 v 0.011 H 5.251 kl 0.008 | env 25.381s learn 18.365s
-iter 64 | steps 131072 | episodes 32 bins 2.844 (lb 1.812) | pi -0.005 v 0.012 H 5.329 kl 0.007 | env 27.627s learn 18.351s
-iter 65 | steps 133120 | episodes 32 bins 2.812 (lb 1.875) | pi -0.003 v 0.013 H 5.192 kl 0.006 | env 27.675s learn 18.371s | eval score 1.156 (2.312 bins; first-fit 1.172)
-iter 66 | steps 135168 | episodes 32 bins 2.688 (lb 1.719) | pi -0.005 v 0.016 H 5.195 kl 0.006 | env 25.919s learn 18.375s
-iter 67 | steps 137216 | episodes 32 bins 2.875 (lb 1.875) | pi -0.006 v 0.009 H 5.204 kl 0.006 | env 31.163s learn 18.354s
-iter 68 | steps 139264 | episodes 32 bins 2.969 (lb 1.906) | pi -0.006 v 0.008 H 5.284 kl 0.002 | env 25.792s learn 18.374s
-iter 69 | steps 141312 | episodes 32 bins 2.812 (lb 1.781) | pi -0.006 v 0.013 H 5.278 kl 0.005 | env 29.976s learn 18.364s
-iter 70 | steps 143360 | episodes 32 bins 2.969 (lb 2.000) | pi -0.006 v 0.008 H 5.202 kl 0.003 | env 27.651s learn 18.361s | eval score 1.125 (2.250 bins; first-fit 1.172) * saved best
-iter 71 | steps 145408 | episodes 32 bins 2.844 (lb 1.906) | pi -0.005 v 0.011 H 5.228 kl 0.004 | env 27.374s learn 18.400s
-iter 72 | steps 147456 | episodes 32 bins 2.781 (lb 1.875) | pi -0.004 v 0.011 H 5.250 kl 0.001 | env 26.903s learn 18.383s
-iter 73 | steps 149504 | episodes 32 bins 2.875 (lb 1.844) | pi -0.005 v 0.009 H 5.122 kl 0.004 | env 26.436s learn 18.381s
-iter 74 | steps 151552 | episodes 32 bins 2.781 (lb 1.844) | pi -0.004 v 0.010 H 5.144 kl 0.005 | env 26.090s learn 18.390s
-iter 75 | steps 153600 | episodes 64 bins 2.844 (lb 1.859) | pi -0.005 v 0.011 H 5.121 kl 0.004 | env 25.797s learn 18.398s | eval score 1.172 (2.344 bins; first-fit 1.172)
-iter 76 | steps 155648 | episodes 32 bins 2.750 (lb 1.844) | pi -0.005 v 0.017 H 5.203 kl 0.006 | env 26.716s learn 18.396s
-iter 77 | steps 157696 | episodes 32 bins 2.781 (lb 1.719) | pi -0.007 v 0.014 H 5.229 kl 0.008 | env 30.419s learn 18.380s
-iter 78 | steps 159744 | episodes 32 bins 2.844 (lb 1.844) | pi -0.005 v 0.011 H 5.209 kl 0.005 | env 22.591s learn 18.395s
-iter 79 | steps 161792 | episodes 32 bins 2.625 (lb 1.719) | pi -0.007 v 0.015 H 5.160 kl 0.006 | env 24.927s learn 18.373s
-iter 80 | steps 163840 | episodes 32 bins 2.781 (lb 1.844) | pi -0.007 v 0.012 H 5.020 kl 0.004 | env 27.824s learn 18.390s | eval score 1.141 (2.281 bins; first-fit 1.172)
-iter 81 | steps 165888 | episodes 32 bins 2.781 (lb 1.719) | pi -0.007 v 0.012 H 5.175 kl 0.006 | env 27.896s learn 18.401s
-iter 82 | steps 167936 | episodes 32 bins 2.750 (lb 1.844) | pi -0.008 v 0.014 H 5.122 kl 0.005 | env 27.732s learn 18.388s
-iter 83 | steps 169984 | episodes 32 bins 2.938 (lb 1.938) | pi -0.006 v 0.008 H 5.246 kl 0.006 | env 27.022s learn 18.410s
-iter 84 | steps 172032 | episodes 32 bins 2.812 (lb 1.906) | pi -0.006 v 0.012 H 5.240 kl 0.003 | env 27.317s learn 18.371s
-iter 85 | steps 174080 | episodes 32 bins 2.812 (lb 1.844) | pi -0.004 v 0.013 H 5.259 kl 0.011 | env 24.885s learn 18.399s | eval score 1.156 (2.312 bins; first-fit 1.172)
-iter 86 | steps 176128 | episodes 32 bins 2.938 (lb 1.938) | pi -0.008 v 0.010 H 5.215 kl 0.005 | env 26.767s learn 18.395s
-iter 87 | steps 178176 | episodes 32 bins 2.688 (lb 1.688) | pi -0.006 v 0.014 H 5.098 kl 0.006 | env 28.778s learn 18.390s
-iter 88 | steps 180224 | episodes 32 bins 2.781 (lb 1.812) | pi -0.005 v 0.010 H 5.101 kl 0.005 | env 26.902s learn 18.406s
-iter 89 | steps 182272 | episodes 32 bins 2.812 (lb 1.844) | pi -0.006 v 0.010 H 5.033 kl 0.002 | env 25.483s learn 18.396s
-iter 90 | steps 184320 | episodes 64 bins 2.797 (lb 1.906) | pi -0.005 v 0.016 H 5.033 kl 0.011 | env 27.958s learn 18.395s | eval score 1.109 (2.219 bins; first-fit 1.172) * saved best
-iter 91 | steps 186368 | episodes 32 bins 2.750 (lb 1.844) | pi -0.007 v 0.015 H 4.971 kl 0.009 | env 26.567s learn 18.356s
-iter 92 | steps 188416 | episodes 32 bins 2.781 (lb 1.812) | pi -0.004 v 0.014 H 4.965 kl 0.003 | env 23.301s learn 18.375s
-iter 93 | steps 190464 | episodes 32 bins 2.750 (lb 1.812) | pi -0.003 v 0.014 H 5.018 kl 0.005 | env 25.177s learn 18.399s
-iter 94 | steps 192512 | episodes 32 bins 2.688 (lb 1.812) | pi -0.004 v 0.014 H 4.958 kl 0.004 | env 27.349s learn 18.381s
-iter 95 | steps 194560 | episodes 32 bins 2.594 (lb 1.781) | pi -0.007 v 0.018 H 5.025 kl 0.008 | env 29.059s learn 18.367s | eval score 1.141 (2.281 bins; first-fit 1.172)
-iter 96 | steps 196608 | episodes 32 bins 2.531 (lb 1.688) | pi -0.002 v 0.016 H 4.951 kl 0.010 | env 27.582s learn 18.376s
-iter 97 | steps 198656 | episodes 32 bins 2.781 (lb 1.812) | pi -0.009 v 0.013 H 4.848 kl 0.006 | env 29.640s learn 18.364s
-iter 98 | steps 200704 | episodes 32 bins 2.656 (lb 1.781) | pi -0.004 v 0.015 H 4.931 kl 0.006 | env 26.992s learn 18.383s
-iter 99 | steps 202752 | episodes 32 bins 2.719 (lb 1.875) | pi -0.006 v 0.016 H 5.147 kl 0.004 | env 34.438s learn 18.375s
-iter 100 | steps 204800 | episodes 32 bins 2.750 (lb 1.844) | pi -0.006 v 0.013 H 5.046 kl 0.006 | env 29.413s learn 18.373s | eval score 1.094 (2.188 bins; first-fit 1.172) * saved best
-iter 101 | steps 206848 | episodes 32 bins 2.750 (lb 1.812) | pi -0.007 v 0.012 H 5.050 kl 0.006 | env 29.340s learn 18.357s
-iter 102 | steps 208896 | episodes 32 bins 2.906 (lb 1.906) | pi -0.005 v 0.010 H 5.153 kl 0.007 | env 25.835s learn 18.392s
-iter 103 | steps 210944 | episodes 32 bins 2.656 (lb 1.812) | pi -0.005 v 0.012 H 4.966 kl 0.006 | env 26.682s learn 18.408s
-iter 104 | steps 212992 | episodes 32 bins 2.750 (lb 1.938) | pi -0.005 v 0.012 H 5.058 kl 0.004 | env 28.183s learn 18.386s
-iter 105 | steps 215040 | episodes 64 bins 2.781 (lb 1.859) | pi -0.008 v 0.016 H 5.028 kl 0.008 | env 25.926s learn 18.375s | eval score 1.094 (2.188 bins; first-fit 1.172)
-iter 106 | steps 217088 | episodes 32 bins 2.750 (lb 1.844) | pi -0.007 v 0.015 H 4.915 kl 0.008 | env 26.711s learn 18.370s
-iter 107 | steps 219136 | episodes 32 bins 2.781 (lb 1.844) | pi -0.007 v 0.015 H 5.021 kl 0.007 | env 25.416s learn 18.408s
-iter 108 | steps 221184 | episodes 32 bins 2.688 (lb 1.938) | pi -0.008 v 0.017 H 4.928 kl 0.007 | env 23.819s learn 18.395s
-iter 109 | steps 223232 | episodes 32 bins 2.781 (lb 1.938) | pi -0.006 v 0.014 H 4.958 kl 0.005 | env 24.912s learn 18.407s
-iter 110 | steps 225280 | episodes 32 bins 2.781 (lb 1.938) | pi -0.006 v 0.014 H 4.879 kl 0.009 | env 26.890s learn 18.397s | eval score 1.109 (2.219 bins; first-fit 1.172)
-iter 111 | steps 227328 | episodes 32 bins 2.781 (lb 1.875) | pi -0.006 v 0.013 H 4.848 kl 0.008 | env 30.246s learn 18.395s
-iter 112 | steps 229376 | episodes 32 bins 2.719 (lb 1.875) | pi -0.006 v 0.016 H 4.890 kl 0.006 | env 24.588s learn 18.387s
-iter 113 | steps 231424 | episodes 32 bins 2.625 (lb 1.781) | pi -0.008 v 0.015 H 4.933 kl 0.005 | env 24.952s learn 18.377s
-iter 114 | steps 233472 | episodes 32 bins 2.656 (lb 1.719) | pi -0.006 v 0.011 H 4.952 kl 0.003 | env 28.457s learn 18.373s
-iter 115 | steps 235520 | episodes 32 bins 2.781 (lb 1.875) | pi -0.005 v 0.013 H 4.996 kl 0.006 | env 24.816s learn 18.405s | eval score 1.094 (2.188 bins; first-fit 1.172)
-iter 116 | steps 237568 | episodes 32 bins 2.688 (lb 1.906) | pi -0.007 v 0.014 H 5.041 kl 0.009 | env 25.643s learn 18.406s
-iter 117 | steps 239616 | episodes 32 bins 2.750 (lb 1.844) | pi -0.007 v 0.010 H 4.915 kl 0.007 | env 25.818s learn 18.395s
-iter 118 | steps 241664 | episodes 32 bins 2.719 (lb 1.844) | pi -0.006 v 0.012 H 4.854 kl 0.003 | env 27.784s learn 18.413s
-iter 119 | steps 243712 | episodes 32 bins 2.844 (lb 1.938) | pi -0.007 v 0.007 H 4.912 kl 0.006 | env 27.643s learn 18.403s
-iter 120 | steps 245760 | episodes 64 bins 2.812 (lb 1.922) | pi -0.007 v 0.016 H 4.924 kl 0.007 | env 27.742s learn 18.382s | eval score 1.109 (2.219 bins; first-fit 1.172)
-iter 121 | steps 247808 | episodes 32 bins 2.656 (lb 1.969) | pi -0.008 v 0.017 H 4.897 kl 0.008 | env 23.522s learn 18.411s
-iter 122 | steps 249856 | episodes 32 bins 2.531 (lb 1.750) | pi -0.005 v 0.019 H 5.093 kl 0.002 | env 25.320s learn 18.401s
-iter 123 | steps 251904 | episodes 32 bins 2.906 (lb 1.906) | pi -0.004 v 0.009 H 5.062 kl 0.007 | env 23.412s learn 18.424s
-iter 124 | steps 253952 | episodes 32 bins 2.781 (lb 1.875) | pi -0.005 v 0.018 H 4.989 kl 0.008 | env 25.633s learn 18.410s
-iter 125 | steps 256000 | episodes 32 bins 2.594 (lb 1.781) | pi -0.004 v 0.017 H 5.019 kl 0.008 | env 29.276s learn 18.397s | eval score 1.078 (2.156 bins; first-fit 1.172) * saved best
-iter 126 | steps 258048 | episodes 32 bins 2.656 (lb 1.875) | pi -0.008 v 0.015 H 4.978 kl 0.004 | env 27.791s learn 18.400s
-iter 127 | steps 260096 | episodes 32 bins 2.750 (lb 1.812) | pi -0.005 v 0.011 H 5.028 kl 0.006 | env 29.848s learn 18.362s
-iter 128 | steps 262144 | episodes 32 bins 2.875 (lb 1.875) | pi -0.008 v 0.010 H 5.022 kl 0.006 | env 27.327s learn 18.370s
-iter 129 | steps 264192 | episodes 32 bins 2.656 (lb 1.875) | pi -0.006 v 0.015 H 5.057 kl 0.005 | env 29.702s learn 18.371s
-iter 130 | steps 266240 | episodes 32 bins 2.750 (lb 1.875) | pi -0.005 v 0.013 H 5.187 kl 0.005 | env 28.437s learn 18.366s | eval score 1.062 (2.125 bins; first-fit 1.172) * saved best
-iter 131 | steps 268288 | episodes 32 bins 2.750 (lb 1.812) | pi -0.005 v 0.009 H 5.104 kl 0.006 | env 27.093s learn 18.371s
-iter 132 | steps 270336 | episodes 32 bins 2.656 (lb 1.875) | pi -0.004 v 0.011 H 5.118 kl 0.007 | env 25.491s learn 18.411s
-iter 133 | steps 272384 | episodes 32 bins 2.750 (lb 1.875) | pi -0.006 v 0.012 H 5.075 kl 0.005 | env 29.022s learn 18.373s
-iter 134 | steps 274432 | episodes 32 bins 2.781 (lb 1.906) | pi -0.007 v 0.008 H 5.133 kl 0.007 | env 24.281s learn 18.376s
-iter 135 | steps 276480 | episodes 64 bins 2.688 (lb 1.844) | pi -0.007 v 0.018 H 5.064 kl 0.001 | env 26.062s learn 18.375s | eval score 1.125 (2.250 bins; first-fit 1.172)
-iter 136 | steps 278528 | episodes 32 bins 2.719 (lb 1.812) | pi -0.007 v 0.012 H 5.161 kl 0.005 | env 22.903s learn 18.388s
-iter 137 | steps 280576 | episodes 32 bins 2.812 (lb 1.906) | pi -0.009 v 0.012 H 5.137 kl 0.007 | env 28.015s learn 18.404s
-iter 138 | steps 282624 | episodes 32 bins 2.562 (lb 1.750) | pi -0.008 v 0.016 H 5.175 kl 0.007 | env 24.893s learn 18.399s
-iter 139 | steps 284672 | episodes 32 bins 2.812 (lb 1.875) | pi -0.007 v 0.011 H 5.007 kl -0.000 | env 26.607s learn 18.405s
-iter 140 | steps 286720 | episodes 32 bins 2.688 (lb 1.906) | pi -0.009 v 0.015 H 5.019 kl 0.007 | env 23.129s learn 18.401s | eval score 1.094 (2.188 bins; first-fit 1.172)
-iter 141 | steps 288768 | episodes 32 bins 2.625 (lb 1.844) | pi -0.007 v 0.013 H 5.049 kl 0.007 | env 24.903s learn 18.382s
-iter 142 | steps 290816 | episodes 32 bins 2.594 (lb 1.781) | pi -0.009 v 0.012 H 4.954 kl 0.007 | env 28.628s learn 18.377s
-iter 143 | steps 292864 | episodes 32 bins 2.688 (lb 1.844) | pi -0.006 v 0.017 H 4.886 kl 0.006 | env 22.975s learn 18.401s
-iter 144 | steps 294912 | episodes 32 bins 2.750 (lb 1.906) | pi -0.008 v 0.012 H 4.947 kl 0.006 | env 26.571s learn 18.377s
-iter 145 | steps 296960 | episodes 32 bins 2.688 (lb 1.812) | pi -0.006 v 0.013 H 4.987 kl 0.008 | env 26.667s learn 18.395s | eval score 1.109 (2.219 bins; first-fit 1.172)
-iter 146 | steps 299008 | episodes 32 bins 2.625 (lb 1.750) | pi -0.009 v 0.015 H 4.925 kl 0.006 | env 28.155s learn 18.383s
-iter 147 | steps 301056 | episodes 32 bins 2.656 (lb 1.781) | pi -0.008 v 0.012 H 4.909 kl 0.010 | env 27.069s learn 18.384s
-iter 148 | steps 303104 | episodes 32 bins 2.625 (lb 1.875) | pi -0.007 v 0.011 H 4.856 kl 0.007 | env 32.963s learn 18.361s
-iter 149 | steps 305152 | episodes 32 bins 2.750 (lb 1.969) | pi -0.005 v 0.010 H 4.783 kl 0.006 | env 24.690s learn 18.413s
-iter 150 | steps 307200 | episodes 64 bins 2.734 (lb 1.812) | pi -0.008 v 0.014 H 4.773 kl 0.004 | env 29.011s learn 18.389s | eval score 1.094 (2.188 bins; first-fit 1.172)
-iter 151 | steps 309248 | episodes 32 bins 2.594 (lb 1.844) | pi -0.010 v 0.016 H 4.683 kl 0.005 | env 26.388s learn 18.387s
-iter 152 | steps 311296 | episodes 32 bins 2.719 (lb 1.938) | pi -0.006 v 0.017 H 4.762 kl 0.003 | env 24.930s learn 18.418s
-iter 153 | steps 313344 | episodes 32 bins 2.719 (lb 1.812) | pi -0.006 v 0.013 H 4.781 kl 0.005 | env 23.173s learn 18.410s
-iter 154 | steps 315392 | episodes 32 bins 2.656 (lb 1.812) | pi -0.006 v 0.015 H 4.774 kl 0.008 | env 24.441s learn 18.404s
-iter 155 | steps 317440 | episodes 32 bins 2.625 (lb 1.812) | pi -0.008 v 0.016 H 4.678 kl 0.010 | env 24.398s learn 18.415s | eval score 1.078 (2.156 bins; first-fit 1.172)
-iter 156 | steps 319488 | episodes 32 bins 2.656 (lb 1.875) | pi -0.008 v 0.017 H 4.595 kl 0.007 | env 31.642s learn 18.393s
-iter 157 | steps 321536 | episodes 32 bins 2.688 (lb 1.938) | pi -0.007 v 0.015 H 4.454 kl 0.005 | env 26.485s learn 18.408s
-iter 158 | steps 323584 | episodes 32 bins 2.562 (lb 1.969) | pi -0.007 v 0.017 H 4.474 kl 0.008 | env 25.745s learn 18.426s
-iter 159 | steps 325632 | episodes 32 bins 2.562 (lb 1.812) | pi -0.007 v 0.013 H 4.577 kl 0.005 | env 26.466s learn 18.411s
-iter 160 | steps 327680 | episodes 32 bins 2.531 (lb 1.812) | pi -0.007 v 0.015 H 4.539 kl 0.007 | env 26.014s learn 18.406s | eval score 1.047 (2.094 bins; first-fit 1.172) * saved best
-iter 161 | steps 329728 | episodes 32 bins 2.688 (lb 1.906) | pi -0.007 v 0.014 H 4.563 kl 0.009 | env 22.612s learn 18.412s
-iter 162 | steps 331776 | episodes 32 bins 2.750 (lb 1.812) | pi -0.006 v 0.011 H 4.603 kl 0.008 | env 23.478s learn 18.402s
-iter 163 | steps 333824 | episodes 32 bins 2.594 (lb 1.969) | pi -0.006 v 0.016 H 4.436 kl 0.003 | env 27.832s learn 18.405s
-iter 164 | steps 335872 | episodes 32 bins 2.562 (lb 1.875) | pi -0.008 v 0.015 H 4.460 kl 0.008 | env 27.535s learn 18.397s
-iter 165 | steps 337920 | episodes 64 bins 2.547 (lb 1.875) | pi -0.008 v 0.021 H 4.503 kl 0.004 | env 26.026s learn 18.385s | eval score 1.062 (2.125 bins; first-fit 1.172)
-iter 166 | steps 339968 | episodes 32 bins 2.469 (lb 1.750) | pi -0.009 v 0.014 H 4.549 kl 0.004 | env 31.449s learn 18.369s
-iter 167 | steps 342016 | episodes 32 bins 2.531 (lb 1.781) | pi -0.009 v 0.015 H 4.528 kl 0.003 | env 23.252s learn 18.403s
-iter 168 | steps 344064 | episodes 32 bins 2.375 (lb 1.781) | pi -0.008 v 0.014 H 4.505 kl 0.010 | env 22.809s learn 18.429s
-iter 169 | steps 346112 | episodes 32 bins 2.656 (lb 1.875) | pi -0.005 v 0.016 H 4.500 kl 0.005 | env 24.865s learn 18.413s
-iter 170 | steps 348160 | episodes 32 bins 2.562 (lb 1.875) | pi -0.007 v 0.016 H 4.498 kl 0.006 | env 26.097s learn 18.395s | eval score 1.062 (2.125 bins; first-fit 1.172)
-iter 171 | steps 350208 | episodes 32 bins 2.312 (lb 1.875) | pi -0.008 v 0.016 H 4.285 kl 0.004 | env 28.351s learn 18.402s
-iter 172 | steps 352256 | episodes 32 bins 2.562 (lb 1.844) | pi -0.007 v 0.016 H 4.355 kl 0.004 | env 26.664s learn 18.403s
-iter 173 | steps 354304 | episodes 32 bins 2.375 (lb 1.781) | pi -0.008 v 0.018 H 4.318 kl 0.007 | env 29.287s learn 18.406s
-iter 174 | steps 356352 | episodes 32 bins 2.438 (lb 1.844) | pi -0.007 v 0.015 H 4.411 kl 0.009 | env 26.024s learn 18.411s
-iter 175 | steps 358400 | episodes 32 bins 2.625 (lb 1.969) | pi -0.005 v 0.017 H 4.336 kl 0.010 | env 27.581s learn 18.419s | eval score 1.062 (2.125 bins; first-fit 1.172)
-iter 176 | steps 360448 | episodes 32 bins 2.656 (lb 1.844) | pi -0.008 v 0.014 H 4.250 kl 0.007 | env 26.670s learn 18.425s
-iter 177 | steps 362496 | episodes 32 bins 2.375 (lb 1.875) | pi -0.009 v 0.017 H 4.092 kl 0.007 | env 27.715s learn 18.412s
-iter 178 | steps 364544 | episodes 32 bins 2.312 (lb 1.875) | pi -0.006 v 0.014 H 4.105 kl 0.004 | env 25.818s learn 18.429s
-iter 179 | steps 366592 | episodes 32 bins 2.500 (lb 1.812) | pi -0.005 v 0.012 H 4.125 kl 0.011 | env 27.953s learn 18.410s
-iter 180 | steps 368640 | episodes 64 bins 2.562 (lb 1.797) | pi -0.008 v 0.019 H 4.138 kl 0.011 | env 28.582s learn 18.413s | eval score 1.078 (2.156 bins; first-fit 1.172)
-iter 181 | steps 370688 | episodes 32 bins 2.438 (lb 1.781) | pi -0.009 v 0.019 H 4.260 kl 0.004 | env 25.124s learn 18.400s
-iter 182 | steps 372736 | episodes 32 bins 2.531 (lb 1.875) | pi -0.006 v 0.017 H 4.239 kl 0.001 | env 23.064s learn 18.413s
-iter 183 | steps 374784 | episodes 32 bins 2.406 (lb 1.969) | pi -0.007 v 0.015 H 4.155 kl 0.007 | env 24.374s learn 18.420s
-iter 184 | steps 376832 | episodes 32 bins 2.438 (lb 1.875) | pi -0.007 v 0.016 H 4.166 kl 0.004 | env 25.715s learn 18.420s
-iter 185 | steps 378880 | episodes 32 bins 2.250 (lb 1.781) | pi -0.008 v 0.015 H 3.997 kl 0.006 | env 25.230s learn 18.416s | eval score 1.031 (2.062 bins; first-fit 1.172) * saved best
-iter 186 | steps 380928 | episodes 32 bins 2.469 (lb 1.875) | pi -0.005 v 0.014 H 4.129 kl 0.010 | env 25.690s learn 18.410s
-iter 187 | steps 382976 | episodes 32 bins 2.500 (lb 1.781) | pi -0.005 v 0.017 H 3.984 kl 0.008 | env 30.339s learn 18.402s
-iter 188 | steps 385024 | episodes 32 bins 2.406 (lb 1.812) | pi -0.009 v 0.018 H 4.028 kl 0.009 | env 24.727s learn 18.398s
-iter 189 | steps 387072 | episodes 32 bins 2.219 (lb 1.875) | pi -0.005 v 0.016 H 4.025 kl 0.005 | env 26.257s learn 18.404s
-iter 190 | steps 389120 | episodes 32 bins 2.312 (lb 1.844) | pi -0.009 v 0.016 H 3.995 kl 0.007 | env 25.570s learn 18.402s | eval score 1.016 (2.031 bins; first-fit 1.172) * saved best
-iter 191 | steps 391168 | episodes 32 bins 2.375 (lb 1.844) | pi -0.008 v 0.016 H 4.124 kl 0.014 | env 26.812s learn 18.414s
-iter 192 | steps 393216 | episodes 32 bins 2.438 (lb 1.938) | pi -0.006 v 0.013 H 4.050 kl 0.003 | env 26.610s learn 18.420s
-iter 193 | steps 395264 | episodes 32 bins 2.344 (lb 1.844) | pi -0.004 v 0.014 H 3.826 kl 0.007 | env 27.819s learn 18.430s
-iter 194 | steps 397312 | episodes 32 bins 2.438 (lb 1.844) | pi -0.007 v 0.010 H 3.929 kl 0.012 | env 27.942s learn 18.409s
-iter 195 | steps 399360 | episodes 64 bins 2.391 (lb 1.828) | pi -0.004 v 0.018 H 3.890 kl 0.006 | env 26.249s learn 18.401s | eval score 1.047 (2.094 bins; first-fit 1.172)
-iter 196 | steps 401408 | episodes 32 bins 2.375 (lb 1.812) | pi -0.008 v 0.020 H 4.015 kl 0.010 | env 26.164s learn 18.397s
-iter 197 | steps 403456 | episodes 32 bins 2.219 (lb 1.969) | pi -0.007 v 0.015 H 4.115 kl 0.010 | env 25.162s learn 18.403s
-iter 198 | steps 405504 | episodes 32 bins 2.438 (lb 1.781) | pi -0.007 v 0.017 H 4.178 kl 0.011 | env 23.810s learn 18.409s
-iter 199 | steps 407552 | episodes 32 bins 2.500 (lb 1.938) | pi -0.008 v 0.015 H 4.161 kl 0.006 | env 26.210s learn 18.382s
-iter 200 | steps 409600 | episodes 32 bins 2.375 (lb 1.844) | pi -0.009 v 0.012 H 4.162 kl 0.007 | env 26.124s learn 18.419s | eval score 1.031 (2.062 bins; first-fit 1.172)
-Done. Best eval score 1.016; best model: models/policy.pt, latest: models/policy_latest.pt, log: models/policy_log.csv
+First-fit baseline: score 1.125 (2.312 bins, area lower bound 1.562)
+iter 1 | steps 2048 | episodes 17 bins 2.353 (lb 1.176) | pi -0.000 v 0.179 H 6.379 kl 0.000 | env 19.298s learn 18.214s
+iter 2 | steps 4096 | episodes 36 bins 3.556 (lb 1.639) | pi -0.001 v 0.165 H 6.394 kl 0.001 | env 20.369s learn 18.175s
+iter 3 | steps 6144 | episodes 33 bins 3.091 (lb 1.515) | pi -0.003 v 0.199 H 6.292 kl 0.005 | env 21.106s learn 18.170s
+iter 4 | steps 8192 | episodes 29 bins 3.586 (lb 1.655) | pi -0.002 v 0.196 H 6.172 kl 0.002 | env 23.480s learn 18.183s
+iter 5 | steps 10240 | episodes 30 bins 3.100 (lb 1.533) | pi -0.002 v 0.233 H 6.149 kl 0.001 | env 24.017s learn 18.262s | eval score 1.214 (2.531 bins; first-fit 1.125) * saved best
+iter 6 | steps 12288 | episodes 35 bins 3.200 (lb 1.571) | pi -0.002 v 0.216 H 6.017 kl 0.002 | env 23.214s learn 18.252s
+iter 7 | steps 14336 | episodes 34 bins 3.118 (lb 1.588) | pi -0.002 v 0.188 H 6.024 kl 0.001 | env 23.958s learn 18.244s
+iter 8 | steps 16384 | episodes 36 bins 3.139 (lb 1.639) | pi -0.005 v 0.173 H 6.003 kl 0.001 | env 21.889s learn 18.220s
+iter 9 | steps 18432 | episodes 31 bins 3.000 (lb 1.548) | pi -0.003 v 0.141 H 5.898 kl 0.005 | env 24.088s learn 18.213s
+iter 10 | steps 20480 | episodes 31 bins 3.097 (lb 1.677) | pi -0.003 v 0.106 H 5.887 kl 0.003 | env 24.064s learn 18.222s | eval score 1.214 (2.531 bins; first-fit 1.125) * saved best
+iter 11 | steps 22528 | episodes 38 bins 3.026 (lb 1.553) | pi -0.002 v 0.117 H 5.920 kl 0.001 | env 23.335s learn 18.222s
+iter 12 | steps 24576 | episodes 35 bins 2.914 (lb 1.600) | pi -0.003 v 0.125 H 5.905 kl 0.004 | env 22.896s learn 18.229s
+iter 13 | steps 26624 | episodes 34 bins 2.853 (lb 1.441) | pi -0.002 v 0.106 H 5.886 kl 0.002 | env 23.176s learn 18.236s
+iter 14 | steps 28672 | episodes 41 bins 2.976 (lb 1.610) | pi -0.005 v 0.106 H 5.837 kl 0.003 | env 24.467s learn 18.231s
+iter 15 | steps 30720 | episodes 34 bins 2.706 (lb 1.529) | pi -0.003 v 0.103 H 5.842 kl 0.004 | env 27.482s learn 18.206s | eval score 1.193 (2.469 bins; first-fit 1.125) * saved best
+iter 16 | steps 32768 | episodes 31 bins 2.677 (lb 1.516) | pi -0.004 v 0.104 H 5.779 kl 0.006 | env 21.952s learn 18.217s
+iter 17 | steps 34816 | episodes 34 bins 3.118 (lb 1.618) | pi -0.006 v 0.077 H 5.744 kl 0.004 | env 23.040s learn 18.218s
+iter 18 | steps 36864 | episodes 35 bins 2.914 (lb 1.600) | pi -0.005 v 0.092 H 5.667 kl 0.003 | env 24.668s learn 18.229s
+iter 19 | steps 38912 | episodes 34 bins 2.794 (lb 1.559) | pi -0.003 v 0.083 H 5.695 kl 0.003 | env 23.150s learn 18.198s
+iter 20 | steps 40960 | episodes 35 bins 2.857 (lb 1.571) | pi -0.004 v 0.089 H 5.736 kl 0.004 | env 23.199s learn 18.222s | eval score 1.203 (2.500 bins; first-fit 1.125)
+iter 21 | steps 43008 | episodes 29 bins 2.862 (lb 1.586) | pi -0.002 v 0.067 H 5.770 kl 0.001 | env 25.267s learn 18.226s
+iter 22 | steps 45056 | episodes 33 bins 3.212 (lb 1.758) | pi -0.006 v 0.080 H 5.780 kl 0.009 | env 25.821s learn 18.229s
+iter 23 | steps 47104 | episodes 36 bins 2.889 (lb 1.583) | pi -0.003 v 0.097 H 5.676 kl 0.001 | env 26.292s learn 18.189s
+iter 24 | steps 49152 | episodes 30 bins 3.233 (lb 1.767) | pi -0.002 v 0.071 H 5.701 kl 0.001 | env 27.308s learn 18.212s
+iter 25 | steps 51200 | episodes 34 bins 2.824 (lb 1.618) | pi -0.005 v 0.083 H 5.627 kl 0.007 | env 24.526s learn 18.203s | eval score 1.245 (2.625 bins; first-fit 1.125)
+iter 26 | steps 53248 | episodes 33 bins 2.758 (lb 1.545) | pi -0.006 v 0.102 H 5.676 kl 0.002 | env 23.063s learn 18.227s
+iter 27 | steps 55296 | episodes 39 bins 2.615 (lb 1.385) | pi -0.005 v 0.120 H 5.600 kl 0.006 | env 25.166s learn 18.230s
+iter 28 | steps 57344 | episodes 33 bins 2.848 (lb 1.576) | pi -0.004 v 0.070 H 5.551 kl 0.005 | env 23.544s learn 18.217s
+iter 29 | steps 59392 | episodes 32 bins 3.000 (lb 1.625) | pi -0.004 v 0.091 H 5.680 kl 0.008 | env 25.313s learn 18.204s
+iter 30 | steps 61440 | episodes 37 bins 2.892 (lb 1.541) | pi -0.006 v 0.063 H 5.586 kl 0.003 | env 24.071s learn 18.202s | eval score 1.219 (2.531 bins; first-fit 1.125)
+iter 31 | steps 63488 | episodes 33 bins 2.939 (lb 1.545) | pi -0.004 v 0.062 H 5.602 kl 0.004 | env 22.945s learn 18.231s
+iter 32 | steps 65536 | episodes 33 bins 2.879 (lb 1.455) | pi -0.005 v 0.059 H 5.601 kl 0.002 | env 22.540s learn 18.222s
+iter 33 | steps 67584 | episodes 38 bins 2.763 (lb 1.500) | pi -0.004 v 0.063 H 5.553 kl 0.008 | env 25.839s learn 18.226s
+iter 34 | steps 69632 | episodes 36 bins 2.694 (lb 1.528) | pi -0.002 v 0.062 H 5.511 kl 0.002 | env 25.670s learn 18.211s
+iter 35 | steps 71680 | episodes 35 bins 2.914 (lb 1.657) | pi -0.003 v 0.045 H 5.543 kl 0.005 | env 24.508s learn 18.212s | eval score 1.219 (2.531 bins; first-fit 1.125)
+iter 36 | steps 73728 | episodes 34 bins 2.765 (lb 1.588) | pi -0.004 v 0.065 H 5.561 kl 0.007 | env 26.052s learn 18.204s
+iter 37 | steps 75776 | episodes 36 bins 2.806 (lb 1.611) | pi -0.004 v 0.066 H 5.503 kl 0.002 | env 22.698s learn 18.212s
+iter 38 | steps 77824 | episodes 35 bins 2.686 (lb 1.600) | pi -0.001 v 0.059 H 5.586 kl 0.003 | env 24.904s learn 18.203s
+iter 39 | steps 79872 | episodes 33 bins 2.909 (lb 1.545) | pi -0.006 v 0.065 H 5.582 kl 0.002 | env 25.044s learn 18.209s
+iter 40 | steps 81920 | episodes 35 bins 2.829 (lb 1.543) | pi -0.005 v 0.060 H 5.474 kl 0.004 | env 26.186s learn 18.230s | eval score 1.250 (2.625 bins; first-fit 1.125)
+iter 41 | steps 83968 | episodes 36 bins 2.556 (lb 1.500) | pi -0.002 v 0.091 H 5.550 kl 0.003 | env 23.612s learn 18.229s
+iter 42 | steps 86016 | episodes 37 bins 2.676 (lb 1.541) | pi -0.004 v 0.068 H 5.502 kl 0.003 | env 22.133s learn 18.233s
+iter 43 | steps 88064 | episodes 33 bins 2.818 (lb 1.545) | pi -0.004 v 0.075 H 5.444 kl 0.000 | env 23.745s learn 18.233s
+iter 44 | steps 90112 | episodes 33 bins 2.727 (lb 1.515) | pi -0.002 v 0.079 H 5.433 kl 0.003 | env 23.996s learn 18.223s
+iter 45 | steps 92160 | episodes 30 bins 3.167 (lb 1.733) | pi -0.004 v 0.057 H 5.432 kl 0.002 | env 27.312s learn 18.237s | eval score 1.234 (2.594 bins; first-fit 1.125)
+iter 46 | steps 94208 | episodes 39 bins 2.769 (lb 1.590) | pi -0.004 v 0.109 H 5.351 kl 0.003 | env 25.023s learn 18.224s
+iter 47 | steps 96256 | episodes 26 bins 3.154 (lb 1.885) | pi -0.006 v 0.058 H 5.288 kl 0.004 | env 26.292s learn 18.235s
+iter 48 | steps 98304 | episodes 40 bins 2.675 (lb 1.575) | pi -0.004 v 0.114 H 5.361 kl 0.001 | env 27.635s learn 18.221s
+iter 49 | steps 100352 | episodes 32 bins 2.781 (lb 1.531) | pi -0.005 v 0.070 H 5.271 kl 0.003 | env 25.239s learn 18.237s
+iter 50 | steps 102400 | episodes 36 bins 2.972 (lb 1.611) | pi -0.007 v 0.080 H 5.233 kl 0.004 | env 24.777s learn 18.218s | eval score 1.245 (2.594 bins; first-fit 1.125)
+iter 51 | steps 104448 | episodes 35 bins 2.800 (lb 1.486) | pi -0.005 v 0.100 H 5.180 kl 0.006 | env 23.170s learn 18.232s
+iter 52 | steps 106496 | episodes 38 bins 2.789 (lb 1.553) | pi -0.005 v 0.098 H 5.209 kl 0.003 | env 24.994s learn 18.210s
+iter 53 | steps 108544 | episodes 30 bins 2.767 (lb 1.533) | pi -0.007 v 0.080 H 5.256 kl 0.002 | env 24.161s learn 18.218s
+iter 54 | steps 110592 | episodes 39 bins 2.795 (lb 1.538) | pi -0.003 v 0.114 H 5.193 kl -0.001 | env 27.485s learn 18.216s
+iter 55 | steps 112640 | episodes 38 bins 2.579 (lb 1.447) | pi -0.005 v 0.112 H 5.206 kl 0.004 | env 26.449s learn 18.208s | eval score 1.224 (2.562 bins; first-fit 1.125)
+iter 56 | steps 114688 | episodes 39 bins 2.667 (lb 1.513) | pi -0.004 v 0.079 H 5.193 kl 0.002 | env 27.807s learn 18.195s
+iter 57 | steps 116736 | episodes 33 bins 2.758 (lb 1.515) | pi -0.003 v 0.067 H 5.185 kl 0.003 | env 23.204s learn 18.208s
+iter 58 | steps 118784 | episodes 43 bins 2.512 (lb 1.442) | pi -0.003 v 0.094 H 5.314 kl 0.003 | env 23.262s learn 18.222s
+iter 59 | steps 120832 | episodes 34 bins 2.647 (lb 1.500) | pi -0.005 v 0.072 H 5.201 kl 0.000 | env 23.580s learn 18.211s
+iter 60 | steps 122880 | episodes 31 bins 2.806 (lb 1.581) | pi -0.002 v 0.068 H 5.201 kl 0.007 | env 24.548s learn 18.219s | eval score 1.292 (2.719 bins; first-fit 1.125)
+iter 61 | steps 124928 | episodes 36 bins 2.722 (lb 1.583) | pi -0.005 v 0.073 H 5.195 kl 0.002 | env 24.747s learn 18.211s
+iter 62 | steps 126976 | episodes 34 bins 2.853 (lb 1.647) | pi -0.002 v 0.066 H 5.077 kl 0.002 | env 24.960s learn 18.242s
+iter 63 | steps 129024 | episodes 40 bins 2.875 (lb 1.650) | pi -0.001 v 0.064 H 5.222 kl 0.004 | env 23.307s learn 18.233s
+iter 64 | steps 131072 | episodes 26 bins 2.692 (lb 1.500) | pi -0.004 v 0.065 H 5.130 kl 0.005 | env 25.883s learn 18.221s
+iter 65 | steps 133120 | episodes 44 bins 2.773 (lb 1.500) | pi -0.003 v 0.082 H 5.132 kl 0.008 | env 25.896s learn 18.211s | eval score 1.234 (2.562 bins; first-fit 1.125)
+iter 66 | steps 135168 | episodes 35 bins 2.571 (lb 1.400) | pi -0.002 v 0.069 H 5.199 kl 0.006 | env 22.635s learn 18.217s
+iter 67 | steps 137216 | episodes 32 bins 2.906 (lb 1.656) | pi -0.005 v 0.042 H 5.229 kl 0.006 | env 26.911s learn 18.223s
+iter 68 | steps 139264 | episodes 33 bins 2.727 (lb 1.545) | pi -0.006 v 0.064 H 5.241 kl 0.001 | env 26.443s learn 18.221s
+iter 69 | steps 141312 | episodes 34 bins 2.706 (lb 1.500) | pi -0.003 v 0.065 H 5.144 kl 0.009 | env 28.051s learn 18.223s
+iter 70 | steps 143360 | episodes 35 bins 2.800 (lb 1.600) | pi -0.001 v 0.061 H 5.050 kl 0.003 | env 24.704s learn 18.206s | eval score 1.203 (2.500 bins; first-fit 1.125)
+iter 71 | steps 145408 | episodes 33 bins 2.879 (lb 1.606) | pi -0.004 v 0.055 H 5.112 kl 0.005 | env 26.811s learn 18.215s
+iter 72 | steps 147456 | episodes 32 bins 2.875 (lb 1.594) | pi -0.008 v 0.066 H 5.082 kl 0.010 | env 27.486s learn 18.221s
+iter 73 | steps 149504 | episodes 37 bins 3.054 (lb 1.649) | pi -0.004 v 0.062 H 5.083 kl 0.004 | env 25.433s learn 18.232s
+iter 74 | steps 151552 | episodes 29 bins 2.862 (lb 1.655) | pi -0.005 v 0.060 H 4.998 kl 0.005 | env 25.271s learn 18.230s
+iter 75 | steps 153600 | episodes 35 bins 2.829 (lb 1.543) | pi -0.003 v 0.087 H 5.005 kl 0.004 | env 24.566s learn 18.242s | eval score 1.234 (2.531 bins; first-fit 1.125)
+iter 76 | steps 155648 | episodes 37 bins 2.730 (lb 1.622) | pi -0.003 v 0.074 H 5.096 kl 0.004 | env 26.131s learn 18.214s
+iter 77 | steps 157696 | episodes 30 bins 2.933 (lb 1.667) | pi -0.004 v 0.069 H 5.113 kl 0.003 | env 24.040s learn 18.220s
+iter 78 | steps 159744 | episodes 32 bins 2.812 (lb 1.531) | pi -0.000 v 0.074 H 5.107 kl 0.003 | env 26.646s learn 18.217s
+iter 79 | steps 161792 | episodes 40 bins 2.800 (lb 1.575) | pi -0.004 v 0.084 H 5.132 kl 0.004 | env 27.191s learn 18.189s
+iter 80 | steps 163840 | episodes 37 bins 2.595 (lb 1.459) | pi -0.003 v 0.080 H 5.073 kl 0.009 | env 24.219s learn 18.218s | eval score 1.297 (2.688 bins; first-fit 1.125)
+iter 81 | steps 165888 | episodes 30 bins 2.767 (lb 1.567) | pi -0.005 v 0.063 H 5.035 kl 0.006 | env 24.057s learn 18.237s
+iter 82 | steps 167936 | episodes 42 bins 2.738 (lb 1.595) | pi -0.002 v 0.096 H 5.026 kl 0.002 | env 24.003s learn 18.232s
+iter 83 | steps 169984 | episodes 28 bins 2.750 (lb 1.571) | pi -0.004 v 0.074 H 4.951 kl 0.007 | env 26.355s learn 18.225s
+iter 84 | steps 172032 | episodes 33 bins 2.939 (lb 1.606) | pi -0.004 v 0.057 H 4.994 kl 0.002 | env 23.562s learn 18.223s
+iter 85 | steps 174080 | episodes 33 bins 3.273 (lb 1.818) | pi -0.006 v 0.050 H 5.016 kl 0.004 | env 24.936s learn 18.227s | eval score 1.245 (2.625 bins; first-fit 1.125)
+iter 86 | steps 176128 | episodes 34 bins 2.676 (lb 1.529) | pi -0.005 v 0.084 H 5.001 kl 0.004 | env 27.281s learn 18.199s
+iter 87 | steps 178176 | episodes 30 bins 2.967 (lb 1.700) | pi -0.002 v 0.041 H 4.994 kl 0.004 | env 27.454s learn 18.216s
+iter 88 | steps 180224 | episodes 30 bins 2.967 (lb 1.533) | pi -0.002 v 0.054 H 4.855 kl 0.004 | env 26.955s learn 18.207s
+iter 89 | steps 182272 | episodes 36 bins 3.056 (lb 1.722) | pi -0.003 v 0.068 H 5.031 kl 0.003 | env 25.157s learn 18.216s
+iter 90 | steps 184320 | episodes 33 bins 2.939 (lb 1.606) | pi -0.004 v 0.072 H 4.953 kl 0.001 | env 24.952s learn 18.195s | eval score 1.266 (2.656 bins; first-fit 1.125)
+iter 91 | steps 186368 | episodes 31 bins 2.774 (lb 1.516) | pi -0.007 v 0.085 H 4.892 kl 0.005 | env 25.940s learn 18.210s
+iter 92 | steps 188416 | episodes 43 bins 2.698 (lb 1.512) | pi -0.005 v 0.081 H 4.943 kl 0.003 | env 22.394s learn 18.188s
+iter 93 | steps 190464 | episodes 30 bins 2.467 (lb 1.300) | pi -0.004 v 0.066 H 4.889 kl 0.007 | env 24.136s learn 18.213s
+iter 94 | steps 192512 | episodes 38 bins 2.737 (lb 1.526) | pi -0.004 v 0.060 H 4.872 kl 0.006 | env 26.536s learn 18.215s
+iter 95 | steps 194560 | episodes 37 bins 2.784 (lb 1.622) | pi -0.006 v 0.053 H 4.990 kl 0.005 | env 24.315s learn 18.203s | eval score 1.271 (2.625 bins; first-fit 1.125)
+iter 96 | steps 196608 | episodes 31 bins 2.613 (lb 1.484) | pi -0.004 v 0.070 H 5.013 kl 0.003 | env 25.141s learn 18.185s
+iter 97 | steps 198656 | episodes 32 bins 3.156 (lb 1.719) | pi -0.004 v 0.060 H 4.965 kl 0.008 | env 28.428s learn 18.196s
+iter 98 | steps 200704 | episodes 40 bins 2.750 (lb 1.600) | pi -0.006 v 0.092 H 4.981 kl 0.007 | env 26.926s learn 18.188s
+iter 99 | steps 202752 | episodes 32 bins 2.844 (lb 1.500) | pi -0.005 v 0.056 H 5.005 kl 0.005 | env 26.403s learn 18.200s
+iter 100 | steps 204800 | episodes 33 bins 3.000 (lb 1.758) | pi -0.005 v 0.051 H 4.935 kl 0.007 | env 24.649s learn 18.212s | eval score 1.255 (2.625 bins; first-fit 1.125)
+iter 101 | steps 206848 | episodes 35 bins 2.800 (lb 1.600) | pi -0.006 v 0.067 H 5.004 kl 0.006 | env 24.738s learn 18.208s
+iter 102 | steps 208896 | episodes 28 bins 2.786 (lb 1.571) | pi -0.002 v 0.061 H 4.963 kl 0.002 | env 23.869s learn 18.225s
+iter 103 | steps 210944 | episodes 34 bins 3.000 (lb 1.676) | pi -0.005 v 0.082 H 4.901 kl 0.004 | env 23.518s learn 18.237s
+iter 104 | steps 212992 | episodes 36 bins 2.778 (lb 1.583) | pi -0.006 v 0.091 H 4.888 kl 0.003 | env 22.903s learn 18.229s
+iter 105 | steps 215040 | episodes 39 bins 2.718 (lb 1.538) | pi -0.005 v 0.090 H 4.891 kl -0.000 | env 25.218s learn 18.232s | eval score 1.250 (2.625 bins; first-fit 1.125)
+iter 106 | steps 217088 | episodes 31 bins 2.548 (lb 1.452) | pi -0.004 v 0.100 H 4.850 kl 0.005 | env 26.497s learn 18.235s
+iter 107 | steps 219136 | episodes 37 bins 2.946 (lb 1.595) | pi -0.006 v 0.090 H 4.903 kl 0.005 | env 27.628s learn 18.235s
+iter 108 | steps 221184 | episodes 30 bins 2.733 (lb 1.567) | pi -0.004 v 0.078 H 4.815 kl 0.006 | env 23.794s learn 18.240s
+iter 109 | steps 223232 | episodes 32 bins 3.156 (lb 1.719) | pi -0.005 v 0.056 H 4.963 kl 0.002 | env 28.598s learn 18.228s
+iter 110 | steps 225280 | episodes 31 bins 3.258 (lb 1.677) | pi -0.004 v 0.050 H 4.817 kl 0.002 | env 24.840s learn 18.226s | eval score 1.260 (2.656 bins; first-fit 1.125)
+iter 111 | steps 227328 | episodes 32 bins 3.062 (lb 1.625) | pi -0.007 v 0.061 H 4.854 kl 0.005 | env 23.099s learn 18.240s
+iter 112 | steps 229376 | episodes 44 bins 2.523 (lb 1.477) | pi -0.005 v 0.107 H 4.851 kl 0.001 | env 22.815s learn 18.235s
+iter 113 | steps 231424 | episodes 32 bins 2.781 (lb 1.562) | pi -0.004 v 0.061 H 4.813 kl 0.004 | env 27.609s learn 18.225s
+iter 114 | steps 233472 | episodes 31 bins 2.839 (lb 1.645) | pi -0.005 v 0.072 H 4.916 kl 0.005 | env 25.348s learn 18.224s
+iter 115 | steps 235520 | episodes 34 bins 2.794 (lb 1.618) | pi -0.004 v 0.080 H 4.827 kl 0.002 | env 24.203s learn 18.228s | eval score 1.260 (2.656 bins; first-fit 1.125)
+iter 116 | steps 237568 | episodes 35 bins 2.943 (lb 1.657) | pi -0.005 v 0.059 H 4.871 kl 0.004 | env 24.849s learn 18.231s
+iter 117 | steps 239616 | episodes 44 bins 2.455 (lb 1.386) | pi -0.005 v 0.110 H 4.953 kl 0.002 | env 22.809s learn 18.231s
+iter 118 | steps 241664 | episodes 33 bins 2.758 (lb 1.545) | pi -0.007 v 0.063 H 4.870 kl 0.006 | env 22.309s learn 18.232s
+iter 119 | steps 243712 | episodes 34 bins 2.794 (lb 1.618) | pi -0.004 v 0.081 H 4.845 kl -0.000 | env 25.377s learn 18.238s
+iter 120 | steps 245760 | episodes 32 bins 3.031 (lb 1.719) | pi -0.005 v 0.047 H 4.949 kl 0.001 | env 24.225s learn 18.231s | eval score 1.297 (2.750 bins; first-fit 1.125)
+iter 121 | steps 247808 | episodes 36 bins 2.750 (lb 1.528) | pi -0.004 v 0.076 H 4.939 kl 0.005 | env 24.609s learn 18.223s
+iter 122 | steps 249856 | episodes 32 bins 3.094 (lb 1.688) | pi -0.004 v 0.077 H 4.896 kl 0.003 | env 26.306s learn 18.215s
+iter 123 | steps 251904 | episodes 32 bins 2.781 (lb 1.625) | pi -0.005 v 0.070 H 4.941 kl 0.004 | env 23.473s learn 18.209s
+iter 124 | steps 253952 | episodes 32 bins 2.938 (lb 1.656) | pi -0.004 v 0.058 H 4.929 kl 0.004 | env 26.309s learn 18.239s
+iter 125 | steps 256000 | episodes 36 bins 3.028 (lb 1.611) | pi -0.004 v 0.054 H 5.015 kl 0.004 | env 25.926s learn 18.226s | eval score 1.240 (2.594 bins; first-fit 1.125)
+iter 126 | steps 258048 | episodes 35 bins 2.686 (lb 1.486) | pi -0.006 v 0.074 H 4.887 kl 0.007 | env 26.745s learn 18.214s
+iter 127 | steps 260096 | episodes 34 bins 2.706 (lb 1.618) | pi -0.006 v 0.074 H 4.901 kl 0.003 | env 26.593s learn 18.224s
+iter 128 | steps 262144 | episodes 32 bins 2.906 (lb 1.625) | pi -0.005 v 0.068 H 5.001 kl 0.007 | env 25.727s learn 18.228s
+iter 129 | steps 264192 | episodes 32 bins 3.094 (lb 1.688) | pi -0.003 v 0.060 H 5.003 kl 0.002 | env 25.248s learn 18.246s
+iter 130 | steps 266240 | episodes 32 bins 2.938 (lb 1.688) | pi -0.007 v 0.072 H 4.914 kl 0.009 | env 27.370s learn 18.216s | eval score 1.255 (2.625 bins; first-fit 1.125)
+iter 131 | steps 268288 | episodes 34 bins 3.029 (lb 1.588) | pi -0.005 v 0.049 H 4.924 kl 0.005 | env 24.964s learn 18.222s
+iter 132 | steps 270336 | episodes 33 bins 2.848 (lb 1.576) | pi -0.005 v 0.063 H 5.010 kl 0.005 | env 25.722s learn 18.228s
+iter 133 | steps 272384 | episodes 37 bins 2.865 (lb 1.541) | pi -0.006 v 0.082 H 5.013 kl 0.006 | env 24.350s learn 18.205s
+iter 134 | steps 274432 | episodes 31 bins 3.065 (lb 1.613) | pi -0.007 v 0.057 H 4.965 kl 0.001 | env 23.840s learn 18.213s
+iter 135 | steps 276480 | episodes 29 bins 2.828 (lb 1.655) | pi -0.004 v 0.068 H 5.032 kl 0.003 | env 24.547s learn 18.238s | eval score 1.245 (2.594 bins; first-fit 1.125)
+iter 136 | steps 278528 | episodes 38 bins 3.000 (lb 1.684) | pi -0.002 v 0.076 H 5.094 kl 0.003 | env 28.071s learn 18.219s
+iter 137 | steps 280576 | episodes 32 bins 2.844 (lb 1.656) | pi -0.006 v 0.080 H 4.922 kl 0.003 | env 27.349s learn 18.228s
+iter 138 | steps 282624 | episodes 30 bins 2.800 (lb 1.533) | pi -0.006 v 0.070 H 5.033 kl 0.006 | env 23.238s learn 18.235s
+iter 139 | steps 284672 | episodes 37 bins 2.838 (lb 1.541) | pi -0.005 v 0.092 H 4.947 kl 0.007 | env 22.330s learn 18.244s
+iter 140 | steps 286720 | episodes 38 bins 2.816 (lb 1.500) | pi -0.005 v 0.086 H 4.978 kl 0.007 | env 24.400s learn 18.246s | eval score 1.214 (2.531 bins; first-fit 1.125)
+iter 141 | steps 288768 | episodes 35 bins 2.800 (lb 1.571) | pi -0.005 v 0.087 H 4.946 kl 0.008 | env 27.105s learn 18.230s
+iter 142 | steps 290816 | episodes 34 bins 2.794 (lb 1.559) | pi -0.006 v 0.068 H 4.910 kl 0.004 | env 26.086s learn 18.221s
+iter 143 | steps 292864 | episodes 37 bins 2.730 (lb 1.622) | pi -0.004 v 0.077 H 4.916 kl 0.003 | env 25.775s learn 18.242s
+iter 144 | steps 294912 | episodes 26 bins 2.538 (lb 1.500) | pi -0.005 v 0.051 H 4.886 kl 0.004 | env 29.761s learn 18.251s
+iter 145 | steps 296960 | episodes 40 bins 2.775 (lb 1.525) | pi -0.006 v 0.081 H 4.908 kl 0.005 | env 25.064s learn 18.234s | eval score 1.240 (2.594 bins; first-fit 1.125)
+iter 146 | steps 299008 | episodes 31 bins 2.710 (lb 1.581) | pi -0.005 v 0.071 H 4.891 kl 0.004 | env 26.767s learn 18.210s
+iter 147 | steps 301056 | episodes 32 bins 2.969 (lb 1.562) | pi -0.007 v 0.073 H 5.064 kl 0.007 | env 25.019s learn 18.242s
+iter 148 | steps 303104 | episodes 31 bins 2.935 (lb 1.742) | pi -0.004 v 0.065 H 4.947 kl 0.008 | env 23.756s learn 18.249s
+iter 149 | steps 305152 | episodes 37 bins 2.946 (lb 1.622) | pi -0.006 v 0.063 H 5.024 kl 0.006 | env 24.494s learn 18.233s
+iter 150 | steps 307200 | episodes 38 bins 2.632 (lb 1.421) | pi -0.003 v 0.087 H 5.078 kl 0.002 | env 23.250s learn 18.229s | eval score 1.219 (2.531 bins; first-fit 1.125)
+iter 151 | steps 309248 | episodes 34 bins 2.824 (lb 1.676) | pi -0.004 v 0.060 H 4.942 kl 0.004 | env 26.001s learn 18.219s
+iter 152 | steps 311296 | episodes 35 bins 2.543 (lb 1.400) | pi -0.005 v 0.073 H 4.905 kl 0.002 | env 29.394s learn 18.211s
+iter 153 | steps 313344 | episodes 29 bins 3.103 (lb 1.690) | pi -0.006 v 0.052 H 4.841 kl 0.008 | env 25.503s learn 18.229s
+iter 154 | steps 315392 | episodes 31 bins 2.871 (lb 1.710) | pi -0.004 v 0.069 H 4.966 kl 0.006 | env 24.906s learn 18.230s
+iter 155 | steps 317440 | episodes 37 bins 2.757 (lb 1.514) | pi -0.004 v 0.065 H 5.016 kl 0.005 | env 23.544s learn 18.206s | eval score 1.255 (2.625 bins; first-fit 1.125)
+iter 156 | steps 319488 | episodes 36 bins 2.944 (lb 1.639) | pi -0.003 v 0.062 H 4.868 kl 0.005 | env 26.365s learn 18.207s
+iter 157 | steps 321536 | episodes 26 bins 2.923 (lb 1.577) | pi -0.006 v 0.048 H 4.939 kl 0.003 | env 26.673s learn 18.226s
+iter 158 | steps 323584 | episodes 36 bins 2.778 (lb 1.556) | pi -0.004 v 0.089 H 4.846 kl 0.005 | env 24.805s learn 18.225s
+iter 159 | steps 325632 | episodes 36 bins 2.778 (lb 1.639) | pi -0.006 v 0.079 H 4.879 kl 0.004 | env 27.503s learn 18.211s
+iter 160 | steps 327680 | episodes 37 bins 3.054 (lb 1.730) | pi -0.004 v 0.046 H 4.789 kl 0.003 | env 23.623s learn 18.233s | eval score 1.281 (2.625 bins; first-fit 1.125)
+iter 161 | steps 329728 | episodes 28 bins 2.857 (lb 1.607) | pi -0.008 v 0.052 H 4.673 kl 0.006 | env 27.183s learn 18.231s
+iter 162 | steps 331776 | episodes 39 bins 2.846 (lb 1.641) | pi -0.003 v 0.083 H 4.749 kl 0.001 | env 25.758s learn 18.219s
+iter 163 | steps 333824 | episodes 28 bins 2.500 (lb 1.393) | pi -0.003 v 0.071 H 4.814 kl 0.005 | env 28.467s learn 18.226s
+iter 164 | steps 335872 | episodes 41 bins 2.976 (lb 1.634) | pi -0.006 v 0.057 H 4.849 kl 0.007 | env 29.691s learn 18.216s
+iter 165 | steps 337920 | episodes 30 bins 2.833 (lb 1.567) | pi -0.006 v 0.060 H 4.707 kl 0.001 | env 23.337s learn 18.224s | eval score 1.250 (2.625 bins; first-fit 1.125)
+iter 166 | steps 339968 | episodes 40 bins 2.850 (lb 1.600) | pi -0.006 v 0.074 H 4.665 kl 0.003 | env 24.081s learn 18.232s
+iter 167 | steps 342016 | episodes 27 bins 2.741 (lb 1.593) | pi -0.006 v 0.055 H 4.627 kl 0.007 | env 23.891s learn 18.245s
+iter 168 | steps 344064 | episodes 31 bins 3.065 (lb 1.710) | pi -0.005 v 0.050 H 4.525 kl 0.003 | env 26.977s learn 18.217s
+iter 169 | steps 346112 | episodes 35 bins 2.629 (lb 1.486) | pi -0.006 v 0.074 H 4.554 kl 0.004 | env 25.225s learn 18.221s
+iter 170 | steps 348160 | episodes 34 bins 2.765 (lb 1.559) | pi -0.007 v 0.074 H 4.510 kl 0.009 | env 25.304s learn 18.231s | eval score 1.266 (2.656 bins; first-fit 1.125)
+iter 171 | steps 350208 | episodes 33 bins 2.970 (lb 1.606) | pi -0.006 v 0.063 H 4.550 kl 0.001 | env 26.546s learn 18.228s
+iter 172 | steps 352256 | episodes 39 bins 2.641 (lb 1.513) | pi -0.003 v 0.080 H 4.557 kl 0.005 | env 23.686s learn 18.234s
+iter 173 | steps 354304 | episodes 26 bins 2.962 (lb 1.615) | pi -0.007 v 0.045 H 4.411 kl 0.004 | env 28.093s learn 18.220s
+iter 174 | steps 356352 | episodes 33 bins 2.848 (lb 1.636) | pi -0.004 v 0.077 H 4.469 kl 0.001 | env 24.651s learn 18.213s
+iter 175 | steps 358400 | episodes 31 bins 2.903 (lb 1.677) | pi -0.003 v 0.061 H 4.513 kl 0.005 | env 34.329s learn 18.208s | eval score 1.240 (2.594 bins; first-fit 1.125)
+iter 176 | steps 360448 | episodes 34 bins 2.706 (lb 1.500) | pi -0.008 v 0.071 H 4.554 kl 0.007 | env 26.028s learn 18.206s
+iter 177 | steps 362496 | episodes 36 bins 3.028 (lb 1.639) | pi -0.008 v 0.063 H 4.545 kl 0.004 | env 24.406s learn 18.227s
+iter 178 | steps 364544 | episodes 33 bins 2.667 (lb 1.515) | pi -0.007 v 0.061 H 4.531 kl 0.006 | env 26.125s learn 18.215s
+iter 179 | steps 366592 | episodes 37 bins 2.595 (lb 1.405) | pi -0.003 v 0.094 H 4.573 kl 0.004 | env 22.826s learn 18.220s
+iter 180 | steps 368640 | episodes 34 bins 2.882 (lb 1.559) | pi -0.007 v 0.067 H 4.487 kl 0.004 | env 26.035s learn 18.234s | eval score 1.234 (2.594 bins; first-fit 1.125)
+iter 181 | steps 370688 | episodes 29 bins 3.207 (lb 1.655) | pi -0.008 v 0.051 H 4.539 kl 0.011 | env 27.950s learn 18.210s
+iter 182 | steps 372736 | episodes 36 bins 2.917 (lb 1.639) | pi -0.004 v 0.078 H 4.457 kl 0.002 | env 25.540s learn 18.227s
+iter 183 | steps 374784 | episodes 34 bins 2.912 (lb 1.618) | pi -0.008 v 0.068 H 4.433 kl 0.005 | env 27.351s learn 18.224s
+iter 184 | steps 376832 | episodes 34 bins 2.882 (lb 1.647) | pi -0.006 v 0.070 H 4.347 kl 0.003 | env 25.771s learn 18.236s
+iter 185 | steps 378880 | episodes 34 bins 2.912 (lb 1.735) | pi -0.006 v 0.068 H 4.447 kl 0.007 | env 24.144s learn 18.218s | eval score 1.250 (2.625 bins; first-fit 1.125)
+iter 186 | steps 380928 | episodes 33 bins 2.758 (lb 1.636) | pi -0.006 v 0.078 H 4.413 kl 0.007 | env 28.618s learn 18.222s
+iter 187 | steps 382976 | episodes 30 bins 3.133 (lb 1.800) | pi -0.006 v 0.055 H 4.317 kl 0.007 | env 27.050s learn 18.233s
+iter 188 | steps 385024 | episodes 33 bins 2.727 (lb 1.485) | pi -0.006 v 0.090 H 4.262 kl 0.005 | env 22.872s learn 18.222s
+iter 189 | steps 387072 | episodes 34 bins 2.941 (lb 1.647) | pi -0.006 v 0.065 H 4.428 kl 0.005 | env 25.695s learn 18.222s
+iter 190 | steps 389120 | episodes 36 bins 2.944 (lb 1.611) | pi -0.005 v 0.086 H 4.309 kl 0.003 | env 25.908s learn 18.241s | eval score 1.250 (2.625 bins; first-fit 1.125)
+iter 191 | steps 391168 | episodes 37 bins 2.676 (lb 1.541) | pi -0.005 v 0.106 H 4.381 kl 0.007 | env 25.037s learn 18.233s
+iter 192 | steps 393216 | episodes 36 bins 2.667 (lb 1.528) | pi -0.004 v 0.096 H 4.432 kl 0.005 | env 22.846s learn 18.246s
+iter 193 | steps 395264 | episodes 36 bins 2.750 (lb 1.556) | pi -0.007 v 0.091 H 4.509 kl 0.002 | env 23.081s learn 18.219s
+iter 194 | steps 397312 | episodes 31 bins 2.935 (lb 1.548) | pi -0.005 v 0.068 H 4.412 kl 0.007 | env 25.128s learn 18.225s
+iter 195 | steps 399360 | episodes 37 bins 2.541 (lb 1.459) | pi -0.007 v 0.092 H 4.516 kl 0.008 | env 28.626s learn 18.203s | eval score 1.250 (2.625 bins; first-fit 1.125)
+iter 196 | steps 401408 | episodes 37 bins 2.595 (lb 1.378) | pi -0.006 v 0.076 H 4.460 kl 0.003 | env 22.956s learn 18.207s
+iter 197 | steps 403456 | episodes 40 bins 2.675 (lb 1.525) | pi -0.005 v 0.062 H 4.353 kl 0.005 | env 25.394s learn 18.216s
+iter 198 | steps 405504 | episodes 33 bins 2.727 (lb 1.545) | pi -0.006 v 0.049 H 4.427 kl 0.006 | env 30.630s learn 18.207s
+iter 199 | steps 407552 | episodes 28 bins 2.857 (lb 1.679) | pi -0.007 v 0.052 H 4.294 kl 0.007 | env 27.006s learn 18.203s
+iter 200 | steps 409600 | episodes 39 bins 2.872 (lb 1.667) | pi -0.005 v 0.059 H 4.384 kl 0.002 | env 21.903s learn 18.233s | eval score 1.255 (2.625 bins; first-fit 1.125)
+Done. Best eval score 1.193; best model: models/policy.pt, latest: models/policy_latest.pt, log: models/policy_log.csv
