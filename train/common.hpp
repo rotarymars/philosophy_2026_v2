@@ -9,9 +9,11 @@
 
 #include <torch/torch.h>
 
+#include <chrono>
 #include <cstdint>
 #include <functional>
 #include <map>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -84,6 +86,48 @@ ObsBatch observeSome(const std::vector<PackingEnv>& envs, const std::vector<int>
 
 // Runs the model on a batch that already lives on the model's device.
 PolicyOutput runModel(PolicyNet& model, const ObsBatch& batch);
+
+// ---- Progress -----------------------------------------------------------------
+//
+// A one-line progress bar with elapsed time and ETA on stderr:
+//   offline reference [=========>          ] 45.1%  2712/6012  12m03s elapsed  ETA 14m40s
+// It redraws in place (\r), every 0.25 s on a terminal and every 2 s when the
+// output goes to a file or pipe (tail -f / tee still show it as one live line).
+// add()/set() are thread-safe. The ETA assumes the remaining work goes at the
+// average speed so far, so it is an estimate.
+class Progress {
+ public:
+  Progress(std::string label, double total);
+  ~Progress();
+  Progress(const Progress&) = delete;
+  Progress& operator=(const Progress&) = delete;
+
+  void add(double n);
+  void set(double done);
+  void setDetail(std::string detail);  // extra text after the ETA
+  // Erases the line, so normal output can be printed; the next update redraws it.
+  void clear();
+  // Draws the final state. keepLine: leave it on screen (with the time taken),
+  // else erase it.
+  void finish(bool keepLine = true);
+
+ private:
+  void draw(bool force);  // caller holds mutex_
+  void erase();           // caller holds mutex_
+
+  std::mutex mutex_;
+  std::string label_;
+  std::string detail_;
+  double total_;
+  double done_ = 0;
+  std::chrono::steady_clock::time_point start_;
+  std::chrono::steady_clock::time_point lastDraw_;
+  double interval_;
+  std::size_t shown_ = 0;  // length of the line currently on screen (0 = none)
+  bool finished_ = false;
+};
+
+std::string formatDuration(double seconds);  // "45s", "12m03s", "3h05m"
 
 // ---- Misc ---------------------------------------------------------------------
 

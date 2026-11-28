@@ -32,6 +32,13 @@
   #offline h2 { font-size:14px; margin:0 0 4px; }
   #offline p { margin:0 0 8px; color:var(--mute); font-size:12px; }
   #patterns { display:flex; flex-wrap:wrap; gap:10px; }
+  .prog { display:flex; align-items:center; gap:10px; padding:2px 16px 6px; font-size:12px; color:var(--mute); font-variant-numeric:tabular-nums; }
+  .prog[hidden] { display:none; }
+  .prog .lbl { min-width:8.5em; color:var(--ink); }
+  .prog .bar { position:relative; flex:0 0 320px; height:8px; border-radius:4px; background:var(--line); overflow:hidden; }
+  .prog .bar div { position:absolute; left:0; top:0; bottom:0; width:0; }
+  .prog .buf { background:var(--accent); opacity:.3; }
+  .prog .fill { background:var(--accent); }
   .pat { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:6px 8px; }
   .pat.running { border-color:var(--accent); }
   .pat.best { border-color:var(--ok); box-shadow:0 0 0 1px var(--ok); }
@@ -70,6 +77,8 @@
   <span title="bins used ÷ offline reference bins; lower is better, 1.00 = as good as offline">Score <b id="sScore">–</b></span>
   <span id="status"></span>
 </div>
+<div class="prog" id="progPlay" hidden title="dark: pieces shown so far; light: pieces the player has already decided (shown next)"><span class="lbl">Episode</span><span class="bar"><div class="buf"></div><div class="fill"></div></span><span class="txt"></span></div>
+<div class="prog" id="progOff" hidden title="pieces placed by all offline patterns together; a pattern skipped because an earlier one is already optimal counts as done"><span class="lbl">Offline reference</span><span class="bar"><div class="buf"></div><div class="fill"></div></span><span class="txt"></span></div>
 <div id="action"></div>
 <div id="legend">
   <span><span class="sw" style="background:var(--ok);opacity:.5"></span>spots where this piece (this rotation) fits, checked exactly</span>
@@ -184,6 +193,7 @@ function startStep(step) {
   // there), "slide" (settling path).
   current = { step, segs, seg: 0, t: 0, pts: step.path[0], phase: "show", timer: 0.45 };
   $("sItem").textContent = `${step.index + 1} / ${meta.items}`;
+  updateProg(progPlay, step.index + 1, meta.items, received, "pieces");
   $("sLegal").textContent = step.legalCount;
   const where = step.newBin ? "a new bin" : `open bin ${step.slot + 1} (Bin ${step.targetBin + 1})`;
   let txt = `Chosen: ${where}, rotation ${ROT_NAMES[step.rotation] ?? step.rotation}, spot (${step.gx}, ${step.gy})`;
@@ -214,6 +224,7 @@ function tick(now) {
         let txt = `Done: ${msg.binsUsed} bins (area lower bound ${msg.lowerBound})`;
         if (msg.score >= 0) { $("sScore").textContent = msg.score.toFixed(2); txt += ` · score ${msg.score.toFixed(2)}`; }
         $("status").textContent = txt;
+        finishProg(progPlay, `done · ${msg.binsUsed} bins`);
       }
     }
     if (current) {
@@ -241,12 +252,55 @@ requestAnimationFrame(tick);
 // Offline reference, live: every packing pattern (an item order plus a
 // bin-choice rule) runs at the same time as the episode, and each placement
 // is drawn the moment the packer makes it.
-let offline = null;  // { pats: [{ name, description, div, st, bins, placed, bins count }], total }
+let offline = null;
+
+// Progress bars with elapsed time and an ETA from the speed over the last
+// ~20 s (so pausing or changing the animation speed is reflected quickly).
+function fmtTime(sec) {
+  if (!isFinite(sec) || sec < 0) return "?";
+  sec = Math.round(sec);
+  if (sec < 60) return sec + "s";
+  if (sec < 3600) return Math.floor(sec / 60) + "m" + String(sec % 60).padStart(2, "0") + "s";
+  return Math.floor(sec / 3600) + "h" + String(Math.floor(sec / 60) % 60).padStart(2, "0") + "m";
+}
+function makeProg(id) {
+  const el = $(id);
+  const pr = { el, start: performance.now(), samples: [], doneAt: null };
+  el.hidden = false;
+  el.querySelector(".fill").style.width = "0";
+  el.querySelector(".buf").style.width = "0";
+  el.querySelector(".txt").textContent = "starting…";
+  return pr;
+}
+function updateProg(pr, done, total, buffered, unit) {
+  if (!pr || pr.doneAt) return;
+  const now = performance.now();
+  pr.samples.push([now, done]);
+  while (pr.samples.length > 2 && now - pr.samples[0][0] > 20000) pr.samples.shift();
+  const f = total > 0 ? Math.min(1, done / total) : 0;
+  pr.el.querySelector(".fill").style.width = (100 * f) + "%";
+  if (buffered !== undefined) pr.el.querySelector(".buf").style.width = (100 * Math.min(1, buffered / total)) + "%";
+  const elapsed = (now - pr.start) / 1000;
+  const [t0, d0] = pr.samples[0];
+  const rate = (done - d0) / Math.max(1e-3, (now - t0) / 1000);
+  const eta = done >= total ? 0 : rate > 0 ? (total - done) / rate : Infinity;
+  pr.el.querySelector(".txt").textContent =
+    `${(100 * f).toFixed(1)}% · ${done} / ${total} ${unit} · ${fmtTime(elapsed)} elapsed · ETA ${fmtTime(eta)}`;
+}
+function finishProg(pr, text) {
+  if (!pr || pr.doneAt) return;
+  pr.doneAt = performance.now();
+  pr.el.querySelector(".fill").style.width = "100%";
+  pr.el.querySelector(".buf").style.width = "100%";
+  pr.el.querySelector(".txt").textContent = `${text} · took ${fmtTime((pr.doneAt - pr.start) / 1000)}`;
+}
+let progPlay = null, progOff = null, received = 0;  // { pats: [{ name, description, div, st, bins, placed, bins count }], total }
 
 function offlinePlan(msg) {
   $("offline").hidden = false;
   $("patterns").innerHTML = "";
-  offline = { total: meta ? meta.items : 0, pats: [] };
+  offline = { total: meta ? meta.items : 0, pats: [], skipped: 0 };
+  progOff = makeProg("progOff");
   msg.patterns.forEach(p => {
     const div = document.createElement("div");
     div.className = "pat";
@@ -270,7 +324,7 @@ function offlineEvent(msg) {
   if (!offline) return;
   const p = offline.pats[msg.pattern];
   if (msg.type === "offlineStart") { p.div.classList.add("running"); p.st.textContent = "starting"; }
-  else if (msg.type === "offlineSkip") { p.div.classList.add("skipped"); p.st.textContent = "skipped (already optimal)"; }
+  else if (msg.type === "offlineSkip") { p.div.classList.add("skipped"); p.st.textContent = "skipped (already optimal)"; offline.skipped++; }
   else if (msg.type === "offlinePlace") {
     while (p.bins.length <= msg.bin) p.bins.push(makeBin(p.bins.length, p.mini, 0.3));
     const prev = p.last ? p.last.bin : -1;
@@ -280,6 +334,10 @@ function offlineEvent(msg) {
     drawMini(p, msg.bin);
     if (prev >= 0 && prev !== msg.bin) drawMini(p, prev);
     p.st.textContent = `piece ${p.placed}${offline.total ? " / " + offline.total : ""} · ${p.bins.length} bin${p.bins.length > 1 ? "s" : ""}`;
+  }
+  if (offline.total && msg.type !== "offlineStart") {
+    const placed = offline.pats.reduce((a, q) => a + q.placed, 0) + offline.skipped * offline.total;
+    updateProg(progOff, placed, offline.total * offline.pats.length, undefined, "placements");
   } else if (msg.type === "offlineFinish") {
     p.result = msg.bins;
     p.div.classList.remove("running");
@@ -292,6 +350,7 @@ function offlineEvent(msg) {
 
 function offlineDone(msg) {
   $("sOff").textContent = `${msg.bins} bins`;
+  finishProg(progOff, `done · ${msg.bins} bins`);
   if (!offline) return;
   offline.pats.forEach(p => {
     if (p.result === msg.bins) { p.div.classList.add("best"); p.st.textContent += " ★"; }
@@ -305,6 +364,7 @@ function start() {
   if (es) es.close();
   queue = []; current = null; bins = []; $("bins").innerHTML = ""; paused = false;
   $("offline").hidden = true; $("patterns").innerHTML = ""; offline = null;
+  $("progPlay").hidden = true; $("progOff").hidden = true; progPlay = progOff = null; received = 0;
   $("pause").textContent = "Pause";
   $("status").textContent = "running…"; $("action").textContent = "";
   ["sItem", "sBins", "sLB", "sLegal", "sOff", "sScore"].forEach(id => $(id).textContent = "–");
@@ -318,12 +378,12 @@ function start() {
   es.onmessage = e => {
     let msg;
     try { msg = JSON.parse(e.data); } catch { return; }
-    if (msg.type === "start") { meta = msg; $("legProb").hidden = msg.player !== "policy"; }
+    if (msg.type === "start") { meta = msg; $("legProb").hidden = msg.player !== "policy"; progPlay = makeProg("progPlay"); }
     else if (msg.type === "error") { ended = true; $("status").textContent = "Error: " + msg.message; es.close(); }
     else if (msg.type === "offlinePlan") offlinePlan(msg);
     else if (msg.type.startsWith("offline") && msg.type !== "offline") offlineEvent(msg);
     else if (msg.type === "offline") offlineDone(msg);
-    else { queue.push(msg); if (msg.type === "done") { ended = true; es.close(); } }
+    else { if (msg.type === "step") received++; queue.push(msg); if (msg.type === "done") { ended = true; es.close(); } }
   };
   es.onerror = () => {
     es.close();

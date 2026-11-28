@@ -1,6 +1,8 @@
 #include "common.hpp"
 
 #include <algorithm>
+#include <cmath>
+#include <cstdio>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
@@ -9,6 +11,8 @@
 #include <unordered_map>
 #include <stdexcept>
 #include <thread>
+
+#include <unistd.h>
 
 namespace polypack::train {
 
@@ -204,13 +208,27 @@ std::vector<OfflineResult> offlineReference(const EnvConfig& config, std::uint64
   }
   if (missing.empty()) return results;
   if (!cachePath.empty() && missing.size() < static_cast<std::size_t>(count)) {
-    std::cout << "(" << count - static_cast<int>(missing.size()) << " of " << count << " from " << cachePath << ") "
-              << std::flush;
+    std::cout << "(" << count - static_cast<int>(missing.size()) << " of " << count << " from " << cachePath << ")"
+              << std::endl;
   }
 
   std::vector<std::vector<Polygon>> episodes;
   for (int i : missing) episodes.push_back(episodeItems(config, seedBase + static_cast<std::uint64_t>(i)));
-  const std::vector<OfflineResult> computed = packOfflineEpisodes(episodes, config, patterns, threads);
+  // Progress counts pieces placed over all (episode, pattern) runs; a pattern
+  // skipped because an earlier one already reached the lower bound counts as done.
+  double totalPieces = 0;
+  for (const auto& items : episodes) totalPieces += static_cast<double>(items.size()) * patterns;
+  Progress progress("offline reference (" + std::to_string(missing.size()) + " episodes x " +
+                        std::to_string(patterns) + " patterns)",
+                    totalPieces);
+  OfflineObserver observer;
+  observer.onPlace = [&](int, int, const OfflinePlacement&) { progress.add(1); };
+  observer.onSkip = [&](int episode, int) {
+    progress.add(static_cast<double>(episodes[static_cast<std::size_t>(episode)].size()));
+  };
+  const std::vector<OfflineResult> computed =
+      packOfflineEpisodes(episodes, config, patterns, threads, true, &observer);
+  progress.finish();
   std::ofstream out;
   if (!cachePath.empty()) {
     const std::filesystem::path p(cachePath);
@@ -307,6 +325,108 @@ PolicyOutput runModel(PolicyNet& model, const ObsBatch& b) {
   const ModelConfig& c = model->config();
   return model->forward(b.bins, b.items, b.contact, b.slotF, b.globalF.narrow(1, 0, c.globalFeatures), b.mask,
                         b.critic.narrow(1, 0, c.criticFeatures));
+}
+
+// ---- Progress -----------------------------------------------------------------
+
+std::string formatDuration(double seconds) {
+  if (!(seconds >= 0) || seconds > 1e8) return "?";
+  const long s = static_cast<long>(seconds + 0.5);
+  char buf[32];
+  if (s < 60) std::snprintf(buf, sizeof buf, "%lds", s);
+  else if (s < 3600) std::snprintf(buf, sizeof buf, "%ldm%02lds", s / 60, s % 60);
+  else if (s < 86400) std::snprintf(buf, sizeof buf, "%ldh%02ldm", s / 3600, (s / 60) % 60);
+  else std::snprintf(buf, sizeof buf, "%ldd%02ldh", s / 86400, (s / 3600) % 24);
+  return buf;
+}
+
+Progress::Progress(std::string label, double total)
+    : label_(std::move(label)),
+      total_(total),
+      start_(std::chrono::steady_clock::now()),
+      lastDraw_(start_ - std::chrono::hours(1)),
+      interval_(isatty(STDERR_FILENO) ? 0.25 : 2.0) {}
+
+Progress::~Progress() {
+  const std::lock_guard<std::mutex> lock(mutex_);
+  if (!finished_) erase();
+}
+
+void Progress::add(double n) {
+  const std::lock_guard<std::mutex> lock(mutex_);
+  done_ += n;
+  draw(false);
+}
+
+void Progress::set(double done) {
+  const std::lock_guard<std::mutex> lock(mutex_);
+  done_ = done;
+  draw(false);
+}
+
+void Progress::setDetail(std::string detail) {
+  const std::lock_guard<std::mutex> lock(mutex_);
+  detail_ = std::move(detail);
+}
+
+void Progress::clear() {
+  const std::lock_guard<std::mutex> lock(mutex_);
+  erase();
+  lastDraw_ = std::chrono::steady_clock::now() - std::chrono::hours(1);  // redraw on the next update
+}
+
+void Progress::finish(bool keepLine) {
+  const std::lock_guard<std::mutex> lock(mutex_);
+  if (finished_) return;
+  finished_ = true;
+  if (!keepLine) {
+    erase();
+    return;
+  }
+  done_ = total_;
+  const double elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - start_).count();
+  std::ostringstream line;
+  line << label_ << ": done in " << formatDuration(elapsed);
+  if (!detail_.empty()) line << "  " << detail_;
+  std::cout.flush();
+  std::string text = line.str();
+  const std::size_t len = text.size();
+  if (len < shown_) text += std::string(shown_ - len, ' ');
+  std::cerr << '\r' << text << '\n' << std::flush;
+  shown_ = 0;
+}
+
+void Progress::erase() {
+  if (shown_ == 0) return;
+  std::cerr << '\r' << std::string(shown_, ' ') << '\r' << std::flush;
+  shown_ = 0;
+}
+
+void Progress::draw(bool force) {
+  if (finished_) return;
+  const auto now = std::chrono::steady_clock::now();
+  if (!force && std::chrono::duration<double>(now - lastDraw_).count() < interval_) return;
+  lastDraw_ = now;
+  const double elapsed = std::chrono::duration<double>(now - start_).count();
+  const double fraction = total_ > 0 ? std::clamp(done_ / total_, 0.0, 1.0) : 0.0;
+  constexpr int kWidth = 30;
+  const int filled = static_cast<int>(fraction * kWidth);
+  std::ostringstream line;
+  line << label_ << " [" << std::string(static_cast<std::size_t>(filled), '=')
+       << (filled < kWidth ? ">" : "") << std::string(static_cast<std::size_t>(std::max(0, kWidth - filled - 1)), ' ')
+       << "] " << std::fixed << std::setprecision(1) << std::setw(5) << 100.0 * fraction << "%  ";
+  if (total_ >= 2 && std::abs(total_ - std::round(total_)) < 1e-9 && std::abs(done_ - std::round(done_)) < 1e-9) {
+    line << static_cast<long long>(std::llround(done_)) << '/' << static_cast<long long>(std::llround(total_)) << "  ";
+  }
+  line << formatDuration(elapsed) << " elapsed  ETA "
+       << (fraction > 0 ? formatDuration(elapsed * (1.0 - fraction) / fraction) : std::string("?"));
+  if (!detail_.empty()) line << "  " << detail_;
+  std::string text = line.str();
+  const std::size_t len = text.size();
+  if (len < shown_) text += std::string(shown_ - len, ' ');
+  std::cout.flush();  // keep normal output and the bar in order
+  std::cerr << '\r' << text << std::flush;
+  shown_ = len;
 }
 
 // ---- Misc ---------------------------------------------------------------------

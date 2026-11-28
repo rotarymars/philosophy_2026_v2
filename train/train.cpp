@@ -79,11 +79,16 @@ struct EvalResult {
 // Plays the same fixed-seed episodes every time. model == nullptr plays the
 // first-fit baseline instead. offlineBins[i] is the offline reference for
 // episode i (see polypack/offline.hpp).
+// The progress bar stays on screen when keepLine is set, else it is erased.
 EvalResult evaluate(PolicyNet* model, const EnvConfig& config, int episodes,
-                    const std::vector<int>& offlineBins, const torch::Device& device, int threads) {
+                    const std::vector<int>& offlineBins, const torch::Device& device, int threads,
+                    const std::string& label, bool keepLine) {
   std::vector<PackingEnv> envs(static_cast<std::size_t>(episodes), PackingEnv(config));
   parallelFor(episodes, threads, [&](int i) { envs[static_cast<std::size_t>(i)].reset(kEvalSeedBase + i); });
   std::vector<int64_t> actions(static_cast<std::size_t>(episodes), -1);
+  double totalPieces = 0;
+  for (const PackingEnv& env : envs) totalPieces += env.episodeItemCount();
+  Progress progress(label + " (" + std::to_string(episodes) + " episodes)", totalPieces);
 
   // Episodes differ in length: each step only plays the unfinished ones.
   for (std::vector<int> active = unfinished(envs); !active.empty(); active = unfinished(envs)) {
@@ -104,7 +109,9 @@ EvalResult evaluate(PolicyNet* model, const EnvConfig& config, int episodes,
                                           : firstFitAction(env);
       env.step(action);
     });
+    progress.add(n);
   }
+  progress.finish(keepLine);
 
   EvalResult result;
   for (std::size_t i = 0; i < envs.size(); ++i) {
@@ -204,7 +211,7 @@ int main(int argc, char** argv) {
               << " spots" << (envConfig.settle ? ", settling" : ", no settling") << ")\n";
 
     std::cout << "Offline reference for " << evalEpisodes << " eval episodes (" << offlinePatterns
-              << " packing patterns each)..." << std::flush;
+              << " packing patterns each)" << std::endl;
     std::vector<int> offlineBins;
     for (const OfflineResult& r :
          offlineReference(envConfig, kEvalSeedBase, evalEpisodes, offlinePatterns, threads, offlineCache)) {
@@ -213,8 +220,10 @@ int main(int argc, char** argv) {
     double meanOffline = 0;
     for (int b : offlineBins) meanOffline += b;
     meanOffline /= evalEpisodes;
-    const EvalResult baseline = evaluate(nullptr, envConfig, evalEpisodes, offlineBins, device, threads);
-    std::cout << std::fixed << std::setprecision(3) << " " << meanOffline << " bins\n"
+    std::cout << std::fixed << std::setprecision(3) << "Offline reference: " << meanOffline << " bins" << std::endl;
+    const EvalResult baseline =
+        evaluate(nullptr, envConfig, evalEpisodes, offlineBins, device, threads, "first-fit baseline", true);
+    std::cout << std::fixed << std::setprecision(3)
               << "Score = mean(bins used / offline bins), lower is better, 1.0 = matches offline\n"
               << "First-fit baseline: score " << baseline.meanRatio << " (" << baseline.meanBins
               << " bins, area lower bound " << baseline.meanLowerBound << ")\n";
@@ -235,8 +244,17 @@ int main(int argc, char** argv) {
 
     const auto startTime = std::chrono::steady_clock::now();
     const int firstIteration = static_cast<int>(meta.iteration) + 1;
+    const int lastIteration = firstIteration + iterations - 1;
+    // Whole-run progress: one unit per iteration. Within an iteration, playing
+    // and learning get the shares of time they took in the previous iteration.
+    Progress runProgress("training", iterations);
+    double collectShare = 0.5;
+    const int updatesPerIteration =
+        epochs * static_cast<int>((static_cast<int64_t>(rollout) * numEnvs + minibatch - 1) / minibatch);
     for (int iter = firstIteration; iter < firstIteration + iterations; ++iter) {
       const auto iterStart = std::chrono::steady_clock::now();
+      const double iterDone = iter - firstIteration;
+      const std::string iterText = "iter " + std::to_string(iter) + "/" + std::to_string(lastIteration);
 
       // ---- Collect a rollout -------------------------------------------------
       std::vector<ObsBatch> observations;
@@ -251,6 +269,8 @@ int main(int argc, char** argv) {
       std::mutex statsMutex;
 
       for (int t = 0; t < rollout; ++t) {
+        runProgress.setDetail(iterText + ": playing step " + std::to_string(t + 1) + "/" + std::to_string(rollout));
+        runProgress.set(iterDone + collectShare * t / rollout);
         ObsBatch obs = ObsBatch::allocate(prototype, numEnvs);
         observeAll(envs, obs, threads);
         {
@@ -331,6 +351,9 @@ int main(int argc, char** argv) {
           // Gradient accumulation: each piece contributes its share of the
           // minibatch means, so the update equals one full-minibatch step
           // while only `microBatch` samples' activations are in memory.
+          runProgress.setDetail(iterText + ": learning " + std::to_string(updates + 1) + "/" +
+                                std::to_string(updatesPerIteration));
+          runProgress.set(iterDone + collectShare + (1.0 - collectShare) * updates / updatesPerIteration);
           optimizer.zero_grad();
           double policyLossMb = 0, valueLossMb = 0, entropyMb = 0, klMb = 0;
           for (int64_t ms = start; ms < end; ms += microBatch) {
@@ -385,8 +408,11 @@ int main(int argc, char** argv) {
 
       std::string evalText = "";
       double evalScore = -1, evalBins = -1;
+      if (envSeconds + learnSeconds > 0) collectShare = envSeconds / (envSeconds + learnSeconds);
+      runProgress.clear();
       if (iter % evalEvery == 0 || iter == firstIteration + iterations - 1) {
-        const EvalResult e = evaluate(&model, envConfig, evalEpisodes, offlineBins, device, threads);
+        const EvalResult e =
+            evaluate(&model, envConfig, evalEpisodes, offlineBins, device, threads, "evaluating", false);
         evalScore = e.meanRatio;
         evalBins = e.meanBins;
         const bool improved = evalScore < meta.bestEvalScore;
@@ -406,6 +432,8 @@ int main(int argc, char** argv) {
                 << ") | pi " << policyLossSum / updates << " v " << valueLossSum / updates << " H "
                 << entropySum / updates << " kl " << klSum / updates << " | env " << envSeconds
                 << "s learn " << learnSeconds << "s" << evalText << std::endl;
+      runProgress.setDetail(iterText + " done");
+      runProgress.set(iterDone + 1);
       log << iter << ',' << meta.envSteps << ',' << finishedBins.size() << ',' << meanBins << ','
           << meanBound << ',' << policyLossSum / updates << ',' << valueLossSum / updates << ','
           << entropySum / updates << ',' << klSum / updates << ',' << evalScore << ',' << evalBins << ','
@@ -413,6 +441,8 @@ int main(int argc, char** argv) {
       log.flush();
     }
 
+    runProgress.setDetail("");
+    runProgress.finish();
     std::cout << "Done. Best eval score " << meta.bestEvalScore << "; best model: " << outPath
               << ", latest: " << latestPath << ", log: " << logPath << '\n';
     return 0;

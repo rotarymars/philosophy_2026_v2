@@ -61,6 +61,12 @@ std::vector<PackingEnv> play(Player player, PolicyNet* model, const EnvConfig& c
   std::vector<PackingEnv> envs(static_cast<std::size_t>(episodes), PackingEnv(config));
   parallelFor(episodes, threads, [&](int i) { envs[static_cast<std::size_t>(i)].reset(seedBase + i); });
   std::vector<int64_t> actions(static_cast<std::size_t>(episodes), -1);
+  static const char* const kNames[] = {"policy", "first-fit", "greedy"};
+  double totalPieces = 0;
+  for (const PackingEnv& env : envs) totalPieces += env.episodeItemCount();
+  Progress progress(std::string(kNames[static_cast<int>(player)]) + " playing (" + std::to_string(episodes) +
+                        " episodes)",
+                    totalPieces);
 
   // Episodes differ in length: each step only plays the unfinished ones.
   for (std::vector<int> active = unfinished(envs); !active.empty(); active = unfinished(envs)) {
@@ -88,7 +94,9 @@ std::vector<PackingEnv> play(Player player, PolicyNet* model, const EnvConfig& c
       }
       env.step(action);
     });
+    progress.add(n);
   }
+  progress.finish();
   return envs;
 }
 

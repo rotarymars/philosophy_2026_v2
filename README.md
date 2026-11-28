@@ -55,7 +55,7 @@ A CUDA libtorch also needs the NVIDIA driver and a CUDA toolkit (`nvcc`). The se
    tail -f models/train.out              # watch
    pkill -f polypack_train               # stop
    ```
-   The script rebuilds first, so pulled code is picked up. Its defaults are `--channels 32 --iterations 200 --eval-every 5`; `./build/polypack_train --help` lists every option. Each minibatch's backward pass runs in pieces of `--micro-batch` samples (default 32): the update is the same, and it fits on small GPUs (a 256-sample minibatch at once needs several GB).
+   Every program shows progress bars with elapsed time and an ETA (offline reference, baselines, the whole training run with the current iteration, evaluations); `tail -f models/train.out` shows them as one live line. The script rebuilds first, so pulled code is picked up. Its defaults are `--channels 32 --iterations 200 --eval-every 5`; `./build/polypack_train --help` lists every option. Each minibatch's backward pass runs in pieces of `--micro-batch` samples (default 32): the update is the same, and it fits on small GPUs (a 256-sample minibatch at once needs several GB).
 
    Training writes these files:
    * `models/policy.pt`: the best model so far, judged by the score on 8 fixed evaluation episodes
