@@ -44,8 +44,8 @@ if [[ $RESUME -eq 1 ]]; then
   CMD=(./build/polypack_train --resume models/policy_latest.pt --iterations 200 "${EXTRA[@]}")
   REDIRECT=">>"
 else
-  # Defaults sized for a small GPU or a CPU; later options override earlier ones.
-  CMD=(./build/polypack_train --channels 32 --iterations 200 --eval-every 5 "${EXTRA[@]}")
+  # Defaults: 64-channel network, 4 open bins; later options override earlier ones.
+  CMD=(./build/polypack_train --channels 64 --open-bins 4 --iterations 200 --eval-every 5 "${EXTRA[@]}")
   REDIRECT=">"
 fi
 
