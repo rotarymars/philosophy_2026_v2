@@ -314,16 +314,22 @@ function start() {
     minItems: $("minItems").value, maxItems: $("maxItems").value,
   });
   es = new EventSource("/stream?" + p);
+  let ended = false;
   es.onmessage = e => {
-    const msg = JSON.parse(e.data);
+    let msg;
+    try { msg = JSON.parse(e.data); } catch { return; }
     if (msg.type === "start") { meta = msg; $("legProb").hidden = msg.player !== "policy"; }
-    else if (msg.type === "error") { $("status").textContent = "Error: " + msg.message; es.close(); }
+    else if (msg.type === "error") { ended = true; $("status").textContent = "Error: " + msg.message; es.close(); }
     else if (msg.type === "offlinePlan") offlinePlan(msg);
     else if (msg.type.startsWith("offline") && msg.type !== "offline") offlineEvent(msg);
     else if (msg.type === "offline") offlineDone(msg);
-    else { queue.push(msg); if (msg.type === "done") es.close(); }
+    else { queue.push(msg); if (msg.type === "done") { ended = true; es.close(); } }
   };
-  es.onerror = () => es.close();
+  es.onerror = () => {
+    es.close();
+    if (!ended) $("status").textContent =
+      "Stopped unexpectedly: see the terminal running viz/server.py (restart it after git pull)";
+  };
 }
 
 $("start").onclick = start;

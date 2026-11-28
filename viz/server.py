@@ -69,10 +69,18 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", "text/event-stream")
         self.send_header("Cache-Control", "no-cache")
         self.end_headers()
-        proc = subprocess.Popen(cmd, cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+        proc = subprocess.Popen(cmd, cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         try:
             for line in proc.stdout:
                 self.wfile.write(f"data: {line.strip()}\n\n".encode())
+                self.wfile.flush()
+            # If the visualizer failed, show why in the page instead of nothing.
+            if proc.wait() != 0:
+                err = proc.stderr.read().strip()
+                print(f"visualizer failed: {' '.join(cmd)}\n{err}", flush=True)
+                first = err.splitlines()[0] if err else f"polypack_visualize exited with code {proc.returncode}"
+                msg = json.dumps({"type": "error", "message": first[:300]})
+                self.wfile.write(f"data: {msg}\n\n".encode())
                 self.wfile.flush()
         except (BrokenPipeError, ConnectionResetError):
             pass
@@ -85,8 +93,14 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", type=int, default=8000)
     args = ap.parse_args()
+    # Rebuild first so a `git pull` is picked up (a stale binary cannot read new
+    # checkpoints and has no live offline view). Quick if nothing changed.
+    if os.path.isdir(os.path.join(ROOT, "build")):
+        print("building polypack_visualize ...", flush=True)
+        subprocess.run(["cmake", "--build", os.path.join(ROOT, "build"), "--target", "polypack_visualize"],
+                       cwd=ROOT, check=True)
     if not os.path.exists(BINARY):
-        raise SystemExit(f"{BINARY} not found; build with: cmake --build build --target polypack_visualize")
+        raise SystemExit(f"{BINARY} not found; run scripts/setup.sh first")
     print(f"polypack viewer on http://localhost:{args.port}")
     ThreadingHTTPServer(("127.0.0.1", args.port), Handler).serve_forever()
 

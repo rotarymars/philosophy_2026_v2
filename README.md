@@ -100,7 +100,7 @@ For each episode, an offline reference packs the same items while seeing all of 
 
 ```sh
 cmake --build build --target polypack_visualize
-python3 viz/server.py        # open http://localhost:8000
+python3 viz/server.py        # rebuilds the visualizer, then open http://localhost:8000
 ```
 
 Pick a player and a seed, then press Start:

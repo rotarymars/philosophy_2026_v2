@@ -273,7 +273,15 @@ int main(int argc, char** argv) {
     emit(o.str());
     return 0;
   } catch (const std::exception& e) {
-    emit(std::string("{\"type\":\"error\",\"message\":\"") + e.what() + "\"}\n");
+    // First line only (libtorch appends a stack trace), escaped so it stays valid JSON.
+    std::string message = e.what();
+    message = message.substr(0, message.find('\n'));
+    std::string escaped;
+    for (const char ch : message) {
+      if (ch == '"' || ch == '\\') escaped += '\\';
+      if (static_cast<unsigned char>(ch) >= 0x20) escaped += ch;
+    }
+    emit("{\"type\":\"error\",\"message\":\"" + escaped + "\"}\n");
     std::cerr << "error: " << e.what() << '\n';
     return 1;
   }

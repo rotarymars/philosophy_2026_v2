@@ -38,7 +38,7 @@ if [[ ! -f $MODEL ]]; then
   echo "$MODEL not found (git pull, or train first)" >&2
   exit 1
 fi
-cmake --build build --target polypack_evaluate   # picks up pulled code; quick if nothing changed
+cmake --build build   # all programs (train, evaluate, viewer); picks up pulled code, quick if nothing changed
 
 CMD=(./build/polypack_evaluate --model "$MODEL" --greedy-baseline)
 OUT=models/eval.out

@@ -33,7 +33,7 @@ if pgrep -f build/polypack_train >/dev/null; then
   echo "polypack_train is already running (pkill -f polypack_train to stop it)" >&2
   exit 1
 fi
-cmake --build build --target polypack_train   # picks up pulled code; quick if nothing changed
+cmake --build build   # all programs (train, evaluate, viewer); picks up pulled code, quick if nothing changed
 mkdir -p models
 
 if [[ $RESUME -eq 1 ]]; then
