@@ -58,10 +58,17 @@ A CUDA libtorch also needs the NVIDIA driver and a CUDA toolkit (`nvcc`). The se
    The script rebuilds first, so pulled code is picked up. Its defaults are `--channels 32 --iterations 200 --eval-every 5`; `./build/polypack_train --help` lists every option. Each minibatch's backward pass runs in pieces of `--micro-batch` samples (default 32): the update is the same, and it fits on small GPUs (a 256-sample minibatch at once needs several GB).
 
    Training writes these files:
-   * `models/policy.pt`: the best model so far, judged by the score on 32 fixed evaluation episodes
+   * `models/policy.pt`: the best model so far, judged by the score on 8 fixed evaluation episodes
    * `models/policy_latest.pt`: the most recent state, including optimizer state, for `--resume`
    * `models/policy_log.csv`: per-iteration metrics
    * `models/train.out`: the console output
+3. Evaluate a trained model (GPU if present, all CPU cores):
+   ```sh
+   scripts/evaluate.sh                   # models/policy.pt on the 8 eval episodes (fast: offline results are cached)
+   scripts/evaluate.sh --latest          # models/policy_latest.pt instead
+   scripts/evaluate.sh --unseen          # 8 episodes never seen in training; offline reference takes ~2-3 h
+                                         # the first time, so it runs in the background (models/eval_unseen.out)
+   ```
 
    Each checkpoint stores its environment and model settings, so it loads on CPU or GPU without extra flags.
 3. Evaluate against the baselines and draw the bins:
