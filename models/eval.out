@@ -1,0 +1,21 @@
+Episodes: 8, each with a random number of pieces from 501 to 1000 (chosen by its seed)
+Model models/policy.pt (iteration 155, 317440 env steps)
+
+bins used per episode
+episode  pieces  policy  first-fit  greedy  offline  area-lower-bound  offline pattern
+      0     839      24         25      24       22                16  area/first-fit
+      1     695      20         22      20       19                14  area/first-fit
+      2     615      19         20      19       18                13  area/first-fit
+      3     599      18         19      18       17                12  area/first-fit
+      4     923      27         29      27       25                18  area/first-fit
+      5     674      20         22      20       19                14  area/first-fit
+      6     691      20         22      20       19                13  area/first-fit
+      7     657      19         20      19       18                13  area/first-fit
+   mean   711.6  20.875     22.375  20.875   19.625            14.125
+
+score = mean(bins used / offline bins), lower is better
+  policy     1.062
+  first-fit  1.139
+  greedy     1.062
+offline reference is proven optimal (= area lower bound) on 0 of 8 episodes
+exact re-check of every policy packing: OK, no overlaps
